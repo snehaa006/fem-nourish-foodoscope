@@ -121,6 +121,45 @@ interface FlavorSuggestion {
   category: string;
 }
 
+// Ayurvedic flavor ingredient fallback (used when FlavorDB API is unavailable)
+const FLAVOR_FALLBACK: Record<string, { ingredient: string; generic_name: string; category: string }[]> = {
+  sweet: [
+    { ingredient: "jaggery", generic_name: "Jaggery", category: "Sweetener" },
+    { ingredient: "honey", generic_name: "Honey", category: "Sweetener" },
+    { ingredient: "dates", generic_name: "Dates", category: "Fruit" },
+    { ingredient: "coconut", generic_name: "Coconut", category: "Nut" },
+    { ingredient: "sweet potato", generic_name: "Sweet Potato", category: "Vegetable" },
+    { ingredient: "banana", generic_name: "Banana", category: "Fruit" },
+    { ingredient: "rice", generic_name: "Rice", category: "Cereal" },
+    { ingredient: "ghee", generic_name: "Ghee (Clarified Butter)", category: "Dairy" },
+  ],
+  sour: [
+    { ingredient: "lemon", generic_name: "Lemon", category: "Fruit" },
+    { ingredient: "tamarind", generic_name: "Tamarind", category: "Spice" },
+    { ingredient: "amla", generic_name: "Indian Gooseberry (Amla)", category: "Fruit" },
+    { ingredient: "yogurt", generic_name: "Yogurt", category: "Dairy" },
+    { ingredient: "tomato", generic_name: "Tomato", category: "Vegetable" },
+    { ingredient: "raw mango", generic_name: "Raw Mango", category: "Fruit" },
+    { ingredient: "vinegar", generic_name: "Vinegar", category: "Condiment" },
+  ],
+  bitter: [
+    { ingredient: "turmeric", generic_name: "Turmeric", category: "Spice" },
+    { ingredient: "fenugreek", generic_name: "Fenugreek (Methi)", category: "Spice" },
+    { ingredient: "bitter gourd", generic_name: "Bitter Gourd (Karela)", category: "Vegetable" },
+    { ingredient: "neem", generic_name: "Neem Leaves", category: "Herb" },
+    { ingredient: "dark chocolate", generic_name: "Dark Chocolate", category: "Confection" },
+    { ingredient: "dandelion", generic_name: "Dandelion Greens", category: "Herb" },
+  ],
+  salty: [
+    { ingredient: "rock salt", generic_name: "Rock Salt (Sendha Namak)", category: "Mineral" },
+    { ingredient: "sea salt", generic_name: "Sea Salt", category: "Mineral" },
+    { ingredient: "seaweed", generic_name: "Seaweed (Kelp)", category: "Vegetable" },
+    { ingredient: "celery", generic_name: "Celery", category: "Vegetable" },
+    { ingredient: "black salt", generic_name: "Black Salt (Kala Namak)", category: "Mineral" },
+    { ingredient: "miso", generic_name: "Miso", category: "Fermented" },
+  ],
+};
+
 // ==================== HELPER COMPONENTS ====================
 
 const DoshaRadial: React.FC<{
@@ -420,15 +459,23 @@ const PersonalizedDietChart: React.FC = () => {
     setIsLoadingRecipeDetail(true);
     setRecipeDetail(null);
     try {
-      const [recipeData, instructionsData] = await Promise.all([
-        searchRecipeById(recipe.Recipe_id || recipe._id),
-        getInstructionsByRecipeId(recipe.Recipe_id || recipe._id),
+      const [recipeDataRes, instructionsRes] = await Promise.all([
+        searchRecipeById(recipe.Recipe_id || recipe._id).catch(() => null),
+        getInstructionsByRecipeId(recipe.Recipe_id || recipe._id).catch(() => null),
       ]);
+
+      // searchRecipeById returns { recipe, ingredients } — extract .recipe
+      const fullRecipe = recipeDataRes?.recipe || recipe;
+
+      // getInstructionsByRecipeId returns { recipe_id, steps[] } — join steps
+      const instructionText =
+        instructionsRes?.steps && Array.isArray(instructionsRes.steps) && instructionsRes.steps.length > 0
+          ? instructionsRes.steps.map((step: string, i: number) => `${i + 1}. ${step}`).join("\n")
+          : recipe.instructions || "Instructions not available.";
+
       setRecipeDetail({
-        recipe: recipeData || recipe,
-        instructions: typeof instructionsData === "string"
-          ? instructionsData
-          : instructionsData?.instructions || recipe.instructions || "Instructions not available.",
+        recipe: fullRecipe,
+        instructions: instructionText,
       });
     } catch {
       setRecipeDetail({ recipe, instructions: recipe.instructions || "Could not load instructions." });
@@ -446,21 +493,26 @@ const PersonalizedDietChart: React.FC = () => {
     const excludeSet = new Set(patientProfile ? buildExcludeIngredients(patientProfile) : []);
     try {
       const allSuggestions: FlavorSuggestion[] = [];
-      const flavors = ["sweet", "sour", "bitter", "salty"];
+      const flavors = ["sweet", "sour", "bitter", "salty"] as const;
+
+      // Try the FlavorDB API first
+      let apiWorked = false;
       const results = await Promise.all(
         flavors.map(async (flavor) => {
           try {
-            const res = await getIngredientsByFlavor(flavor, 10);
-            if (res && Array.isArray(res)) {
-              return res
+            const res = await getIngredientsByFlavor(flavor, 1, 10);
+            const items = res?.data;
+            if (items && Array.isArray(items) && items.length > 0) {
+              apiWorked = true;
+              return items
                 .filter((item: FlavorIngredient) =>
-                  !excludeSet.has((item.ingredient_name || item.entity_alias_readable || "").toLowerCase())
+                  !excludeSet.has((item.ingredient || item.generic_name || "").toLowerCase())
                 )
                 .slice(0, 5)
                 .map((item: FlavorIngredient) => ({
-                  ingredient: item.entity_alias_readable || item.ingredient_name || "Unknown",
+                  ingredient: item.generic_name || item.ingredient || "Unknown",
                   flavor,
-                  category: item.category || "General",
+                  category: item.FlavorDB_Category || item.Dietrx_Category || "General",
                 }));
             }
             return [];
@@ -468,8 +520,25 @@ const PersonalizedDietChart: React.FC = () => {
         })
       );
       results.forEach((r) => allSuggestions.push(...r));
+
+      // Fallback to built-in Ayurvedic flavor data if API returned nothing
+      if (!apiWorked) {
+        for (const flavor of flavors) {
+          const fallbackItems = FLAVOR_FALLBACK[flavor] || [];
+          const filtered = fallbackItems
+            .filter((item) => !excludeSet.has(item.ingredient.toLowerCase()))
+            .slice(0, 5)
+            .map((item) => ({
+              ingredient: item.generic_name,
+              flavor,
+              category: item.category,
+            }));
+          allSuggestions.push(...filtered);
+        }
+      }
+
       setFlavorSuggestions(allSuggestions);
-      if (allSuggestions.length === 0) toast.info("No flavor suggestions found");
+      if (allSuggestions.length === 0) toast.info("No flavor suggestions available.");
     } catch { toast.error("Failed to fetch flavor suggestions"); }
     finally { setIsLoadingFlavor(false); }
   }, [patientProfile]);
