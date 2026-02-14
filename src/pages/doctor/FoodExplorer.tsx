@@ -320,12 +320,20 @@ function RecipeDetailModal({
     queryKey: ["recipe-detail", recipeId],
     queryFn: () => searchRecipeById(recipeId!),
     enabled: !!recipeId && open,
+    retry: (failureCount, error) => {
+      if (error?.message?.includes("429")) return false;
+      return failureCount < 2;
+    },
   });
 
   const { data: instructionsData, isLoading: loadingInstructions } = useQuery({
     queryKey: ["recipe-instructions", recipeId],
     queryFn: () => getInstructionsByRecipeId(recipeId!),
     enabled: !!recipeId && open,
+    retry: (failureCount, error) => {
+      if (error?.message?.includes("429")) return false;
+      return failureCount < 2;
+    },
   });
 
   const recipe = recipeData?.recipe;
@@ -589,6 +597,12 @@ function RecipeOfDayCard() {
     queryKey: ["recipe-of-day"],
     queryFn: getRecipeOfDay,
     staleTime: 1000 * 60 * 60, // cache 1 hour
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) => {
+      // Don't retry on 429 rate limit errors
+      if (error?.message?.includes("429")) return false;
+      return failureCount < 2;
+    },
   });
 
   if (isLoading) {
@@ -739,6 +753,7 @@ function FlavorExplorer() {
     queryKey: ["ingredients-flavor", selectedFlavor, flavorPage],
     queryFn: () => getIngredientsByFlavor(selectedFlavor, flavorPage, 20),
     enabled: !!selectedFlavor,
+    retry: false, // FlavorDB endpoint may return 404
   });
 
   return (
@@ -1103,6 +1118,11 @@ const FoodExplorer: React.FC = () => {
       }
     },
     staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) => {
+      if (error?.message?.includes("429")) return false;
+      return failureCount < 2;
+    },
   });
 
   const recipes = recipesResult?.data || [];
