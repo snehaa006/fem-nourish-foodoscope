@@ -643,7 +643,7 @@ export const MEAL_STRUCTURE: MealTargets[] = [
 
 // --- Rate limit helper ---
 
-const RATE_LIMIT_DELAY = 1200; // ms between API calls to avoid 429
+const RATE_LIMIT_DELAY = 3500; // ms between API calls to avoid 429
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -651,8 +651,8 @@ function delay(ms: number): Promise<void> {
 
 async function fetchWithRetry<T>(
   fn: () => Promise<T>,
-  retries: number = 2,
-  delayMs: number = 2000
+  retries: number = 3,
+  delayMs: number = 5000
 ): Promise<T> {
   try {
     return await fn();
@@ -661,7 +661,7 @@ async function fetchWithRetry<T>(
     if (retries > 0 && message.includes("429")) {
       console.log(`Rate limited, waiting ${delayMs}ms before retry (${retries} left)...`);
       await delay(delayMs);
-      return fetchWithRetry(fn, retries - 1, delayMs * 1.5);
+      return fetchWithRetry(fn, retries - 1, delayMs * 2);
     }
     throw err;
   }
@@ -714,7 +714,7 @@ export async function fetchRecipesForMeal(
     }
 
     // Fallback: use diet filter + calorie range
-    await delay(RATE_LIMIT_DELAY);
+    await delay(RATE_LIMIT_DELAY + 1500);
     if (dietPref) {
       const res = await fetchWithRetry(() =>
         getRecipesByDiet(dietPref, 20, Math.floor(Math.random() * 10) + 1)
@@ -730,7 +730,7 @@ export async function fetchRecipesForMeal(
     }
 
     // Last fallback: just calorie range
-    await delay(RATE_LIMIT_DELAY);
+    await delay(RATE_LIMIT_DELAY + 1500);
     const res = await fetchWithRetry(() =>
       getRecipesByCalories(minCal, maxCal, 10)
     );
@@ -817,7 +817,15 @@ export async function generateDietChart(
   // This drastically reduces API calls: 5 calls total instead of 5 x numDays.
   const mealRecipePools: Map<string, RecipeBasic[]> = new Map();
 
-  for (const mealSlot of MEAL_STRUCTURE) {
+  // Initial cooldown to avoid rate limit from any prior API usage
+  await delay(2000);
+
+  for (let i = 0; i < MEAL_STRUCTURE.length; i++) {
+    const mealSlot = MEAL_STRUCTURE[i];
+    // Wait between meal type fetches (skip before the first one)
+    if (i > 0) {
+      await delay(RATE_LIMIT_DELAY);
+    }
     try {
       const candidates = await fetchRecipesForMeal(
         mealSlot,
@@ -832,8 +840,6 @@ export async function generateDietChart(
       console.error(`Error fetching recipe pool for ${mealSlot.label}:`, err);
       mealRecipePools.set(mealSlot.mealType, []);
     }
-    // Rate limit between each meal type fetch
-    await delay(RATE_LIMIT_DELAY);
   }
 
   for (let d = 0; d < numDays; d++) {
