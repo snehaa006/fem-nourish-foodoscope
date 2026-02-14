@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useFoodContext } from "@/context/FoodContext";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Save, Plus, Sparkles, Leaf, Target, Clock, User, Heart } from "lucide-react";
+import { Save, Plus, Sparkles, Leaf, Target, Clock, User, Heart, FileEdit, AlertCircle, Loader2 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { getIdToken } from "firebase/auth";
 import { toast } from "sonner";
@@ -29,6 +30,7 @@ const weekDays = [
 ];
 
 const RecipeBuilder = () => {
+  const [searchParams] = useSearchParams();
   const [aiPlan, setAiPlan] = useState(null);
   const [ayurPlan, setAyurPlan] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -47,6 +49,11 @@ const RecipeBuilder = () => {
   const [planType, setPlanType] = useState("weight-management");
   const [saving, setSaving] = useState(false);
 
+  // Draft editing state
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const [editingDraftMeta, setEditingDraftMeta] = useState<Record<string, unknown> | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+
   // Meal plans
   const [mealPlans, setMealPlans] = useState({
     Daily: { Breakfast: [], Lunch: [], Dinner: [], Snack: [] },
@@ -58,6 +65,117 @@ const RecipeBuilder = () => {
 
   // Palette
   const [paletteFoods, setPaletteFoods] = useState([...selectedFoods]);
+
+  // --- Load draft from Personalized Diet Chart ---
+  useEffect(() => {
+    const editPlanId = searchParams.get("editPlanId");
+    const editPatientId = searchParams.get("patientId");
+
+    if (!editPlanId || !editPatientId) return;
+
+    const loadDraft = async () => {
+      setIsLoadingDraft(true);
+      try {
+        const planDoc = await getDoc(
+          doc(db, `patients/${editPatientId}/dietPlans/${editPlanId}`)
+        );
+
+        if (!planDoc.exists()) {
+          toast.error("Draft plan not found.");
+          setIsLoadingDraft(false);
+          return;
+        }
+
+        const planData = planDoc.data();
+
+        // Populate form fields
+        setPatientId(planData.patientId || editPatientId);
+        setPatientName(planData.patientName || "");
+        setPlanDuration(planData.planDuration || "7 days");
+        setPlanType("personalized-diet-chart");
+        setEditingDraftId(editPlanId);
+        setEditingDraftMeta({
+          primaryDosha: planData.primaryDosha,
+          doshaScores: planData.doshaScores,
+          lifeStage: planData.lifeStage,
+          lifeStageLabel: planData.lifeStageLabel,
+          nutritionalTargets: planData.nutritionalTargets,
+          doshaRecommendations: planData.doshaRecommendations,
+          medicalNotes: planData.medicalNotes,
+          excludedIngredients: planData.excludedIngredients,
+          source: planData.source,
+          generatedAt: planData.generatedAt,
+        });
+
+        // Convert personalized-diet-chart days[] to RecipeBuilder Weekly format
+        const mealTypeToSlot: Record<string, string> = {
+          breakfast: "Breakfast",
+          mid_morning: "Snack",
+          lunch: "Lunch",
+          afternoon_snack: "Snack",
+          dinner: "Dinner",
+        };
+
+        const newWeekly: Record<string, Record<string, unknown[]>> = {};
+        weekDays.forEach((day) => {
+          newWeekly[day] = { Breakfast: [], Lunch: [], Dinner: [], Snack: [] };
+        });
+
+        const allFoodsForDaily: Record<string, unknown[]> = {
+          Breakfast: [],
+          Lunch: [],
+          Dinner: [],
+          Snack: [],
+        };
+
+        if (planData.days && Array.isArray(planData.days)) {
+          for (const day of planData.days) {
+            const dayName = day.dayLabel;
+            if (!newWeekly[dayName]) continue;
+
+            for (const meal of day.meals || []) {
+              const slot = mealTypeToSlot[meal.mealType] || "Snack";
+              const foodItem = {
+                Food_Item: meal.recipeName || "Unknown Recipe",
+                Calories: String(meal.calories || meal.actualCalories || 0),
+                Protein: String(meal.protein || 0),
+                Fat: String(meal.fat || 0),
+                Carbs: String(meal.carbs || 0),
+                Region: meal.region || "",
+                cook_time: meal.cookTime || "",
+                Recipe_id: meal.recipeId || "",
+                mealType: meal.mealType,
+                label: meal.label,
+                time: meal.time,
+              };
+
+              newWeekly[dayName][slot].push(foodItem);
+
+              // Also populate daily view from first day
+              if (day.dayNumber === 1) {
+                allFoodsForDaily[slot].push(foodItem);
+              }
+            }
+          }
+        }
+
+        setMealPlans({
+          Daily: allFoodsForDaily,
+          Weekly: newWeekly,
+        });
+
+        setActiveFilter("Weekly");
+        toast.success(`Draft loaded: ${planData.patientName}'s personalized diet plan. You can now drag & drop to edit.`);
+      } catch (err) {
+        console.error("Error loading draft plan:", err);
+        toast.error("Failed to load draft plan.");
+      } finally {
+        setIsLoadingDraft(false);
+      }
+    };
+
+    loadDraft();
+  }, [searchParams]);
 
   const handleDragEnd = (result) => {
     const { source, destination } = result;
@@ -516,16 +634,16 @@ const RecipeBuilder = () => {
 
     setSaving(true);
     try {
-      const dietPlanData = {
+      const dietPlanData: Record<string, unknown> = {
         patientName,
         patientId: patientId.trim(),
         planDuration,
-        planType: "manual",
+        planType: editingDraftId ? "personalized-diet-chart" : "manual",
         meals: mealPlans,
-        createdAt: serverTimestamp(),
         lastModified: serverTimestamp(),
         activeFilter,
-        source: "manual",
+        source: editingDraftId ? "personalized-diet-chart-edited" : "manual",
+        status: "final",
         totalMeals:
           Object.values(mealPlans.Daily).flat().length +
           Object.values(mealPlans.Weekly)
@@ -533,12 +651,35 @@ const RecipeBuilder = () => {
             .flat().length,
       };
 
-      const docRef = await addDoc(
-        collection(db, "patients", patientId.trim(), "dietPlans"),
-        dietPlanData
-      );
+      // Preserve metadata from personalized diet chart draft
+      if (editingDraftId && editingDraftMeta) {
+        dietPlanData.primaryDosha = editingDraftMeta.primaryDosha;
+        dietPlanData.doshaScores = editingDraftMeta.doshaScores;
+        dietPlanData.lifeStage = editingDraftMeta.lifeStage;
+        dietPlanData.lifeStageLabel = editingDraftMeta.lifeStageLabel;
+        dietPlanData.nutritionalTargets = editingDraftMeta.nutritionalTargets;
+        dietPlanData.doshaRecommendations = editingDraftMeta.doshaRecommendations;
+        dietPlanData.medicalNotes = editingDraftMeta.medicalNotes;
+        dietPlanData.excludedIngredients = editingDraftMeta.excludedIngredients;
+        dietPlanData.originalGeneratedAt = editingDraftMeta.generatedAt;
+      }
 
-      toast.success(`Manual diet plan saved successfully! ID: ${docRef.id}`);
+      if (editingDraftId) {
+        // Update existing draft in-place
+        await setDoc(
+          doc(db, `patients/${patientId.trim()}/dietPlans/${editingDraftId}`),
+          dietPlanData,
+          { merge: true }
+        );
+        toast.success("Personalized diet plan updated and approved!");
+      } else {
+        dietPlanData.createdAt = serverTimestamp();
+        const docRef = await addDoc(
+          collection(db, "patients", patientId.trim(), "dietPlans"),
+          dietPlanData
+        );
+        toast.success(`Manual diet plan saved successfully! ID: ${docRef.id}`);
+      }
     } catch (error) {
       console.error("Error saving diet plan:", error);
       toast.error("Failed to save diet plan. Please try again.");
@@ -706,6 +847,70 @@ const RecipeBuilder = () => {
 
   return (
     <div className="p-6">
+      {/* Loading Draft Overlay */}
+      {isLoadingDraft && (
+        <div className="fixed inset-0 bg-white/80 z-50 flex items-center justify-center">
+          <div className="text-center space-y-3">
+            <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto" />
+            <p className="text-sm font-medium text-gray-700">Loading personalized diet plan draft...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Editing Draft Banner */}
+      {editingDraftId && !isLoadingDraft && (
+        <Card className="mb-4 border-green-200 bg-green-50/50">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                <FileEdit className="w-4 h-4 text-green-700" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-green-900">Editing Personalized Diet Chart Draft</p>
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-green-700">
+                  {editingDraftMeta?.primaryDosha && (
+                    <Badge variant="outline" className="text-[10px] h-4 bg-white border-green-300 text-green-700 capitalize">
+                      {String(editingDraftMeta.primaryDosha)} Dosha
+                    </Badge>
+                  )}
+                  {editingDraftMeta?.lifeStageLabel && (
+                    <Badge variant="outline" className="text-[10px] h-4 bg-white border-pink-300 text-pink-700">
+                      {String(editingDraftMeta.lifeStageLabel)}
+                    </Badge>
+                  )}
+                  <span className="text-green-600">Drag & drop meals to rearrange, then save to approve.</span>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-green-300 text-green-700 hover:bg-green-100"
+                onClick={() => {
+                  setEditingDraftId(null);
+                  setEditingDraftMeta(null);
+                  setPatientId("");
+                  setPatientName("");
+                  setMealPlans({
+                    Daily: { Breakfast: [], Lunch: [], Dinner: [], Snack: [] },
+                    Weekly: weekDays.reduce((acc, day) => {
+                      acc[day] = { Breakfast: [], Lunch: [], Dinner: [], Snack: [] };
+                      return acc;
+                    }, {}),
+                  });
+                  setActiveFilter("Daily");
+                  // Clear URL params
+                  window.history.replaceState({}, "", window.location.pathname);
+                  toast.info("Draft editing cancelled.");
+                }}
+              >
+                <AlertCircle className="w-3 h-3" />
+                Cancel Edit
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header with Save Form */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-4">Recipe Builder</h1>
@@ -767,12 +972,17 @@ const RecipeBuilder = () => {
                 <Button
                   onClick={saveMealPlan}
                   disabled={saving}
-                  className="w-full gap-2"
+                  className={`w-full gap-2 ${editingDraftId ? "bg-green-600 hover:bg-green-700" : ""}`}
                 >
                   {saving ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Saving...
+                    </>
+                  ) : editingDraftId ? (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Approve & Save
                     </>
                   ) : (
                     <>

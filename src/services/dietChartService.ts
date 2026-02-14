@@ -641,6 +641,32 @@ export const MEAL_STRUCTURE: MealTargets[] = [
   },
 ];
 
+// --- Rate limit helper ---
+
+const RATE_LIMIT_DELAY = 1200; // ms between API calls to avoid 429
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry<T>(
+  fn: () => Promise<T>,
+  retries: number = 2,
+  delayMs: number = 2000
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (retries > 0 && message.includes("429")) {
+      console.log(`Rate limited, waiting ${delayMs}ms before retry (${retries} left)...`);
+      await delay(delayMs);
+      return fetchWithRetry(fn, retries - 1, delayMs * 1.5);
+    }
+    throw err;
+  }
+}
+
 // --- Fetch recipes for a single meal slot ---
 
 export async function fetchRecipesForMeal(
@@ -666,13 +692,15 @@ export async function fetchRecipesForMeal(
       const searchExcludes = excludeIngredients.slice(0, 5).join(",");
       const searchCategories = focusCategories.slice(0, 3).join(",");
 
-      const results = await getRecipesByIngredientsCategoriesTitle({
-        includeIngredients: searchIncludes || undefined,
-        excludeIngredients: searchExcludes || undefined,
-        includeCategories: searchCategories || undefined,
-        page: Math.floor(Math.random() * 5) + 1,
-        limit: 20,
-      });
+      const results = await fetchWithRetry(() =>
+        getRecipesByIngredientsCategoriesTitle({
+          includeIngredients: searchIncludes || undefined,
+          excludeIngredients: searchExcludes || undefined,
+          includeCategories: searchCategories || undefined,
+          page: Math.floor(Math.random() * 5) + 1,
+          limit: 20,
+        })
+      );
 
       if (results && results.length > 0) {
         // Filter by calorie range client-side
@@ -686,8 +714,11 @@ export async function fetchRecipesForMeal(
     }
 
     // Fallback: use diet filter + calorie range
+    await delay(RATE_LIMIT_DELAY);
     if (dietPref) {
-      const res = await getRecipesByDiet(dietPref, 20, Math.floor(Math.random() * 10) + 1);
+      const res = await fetchWithRetry(() =>
+        getRecipesByDiet(dietPref, 20, Math.floor(Math.random() * 10) + 1)
+      );
       if (res.data && res.data.length > 0) {
         const filtered = res.data.filter((r) => {
           const cal = Number(r.Calories || 0);
@@ -699,7 +730,10 @@ export async function fetchRecipesForMeal(
     }
 
     // Last fallback: just calorie range
-    const res = await getRecipesByCalories(minCal, maxCal, 10);
+    await delay(RATE_LIMIT_DELAY);
+    const res = await fetchWithRetry(() =>
+      getRecipesByCalories(minCal, maxCal, 10)
+    );
     return res.data || [];
   } catch (err) {
     console.error(
@@ -779,6 +813,29 @@ export async function generateDietChart(
     "Sunday",
   ];
 
+  // Fetch a pool of recipes per meal type ONCE, then pick from the pool for each day.
+  // This drastically reduces API calls: 5 calls total instead of 5 x numDays.
+  const mealRecipePools: Map<string, RecipeBasic[]> = new Map();
+
+  for (const mealSlot of MEAL_STRUCTURE) {
+    try {
+      const candidates = await fetchRecipesForMeal(
+        mealSlot,
+        dailyCalories,
+        dietPref,
+        excludeIngredients,
+        includeIngredients,
+        targets.focusCategories
+      );
+      mealRecipePools.set(mealSlot.mealType, candidates);
+    } catch (err) {
+      console.error(`Error fetching recipe pool for ${mealSlot.label}:`, err);
+      mealRecipePools.set(mealSlot.mealType, []);
+    }
+    // Rate limit between each meal type fetch
+    await delay(RATE_LIMIT_DELAY);
+  }
+
   for (let d = 0; d < numDays; d++) {
     const meals: DietChartMeal[] = [];
     let dayTotalCal = 0;
@@ -788,41 +845,28 @@ export async function generateDietChart(
 
     for (const mealSlot of MEAL_STRUCTURE) {
       const targetCal = Math.round(dailyCalories * mealSlot.caloriePercent);
+      const pool = mealRecipePools.get(mealSlot.mealType) || [];
 
-      try {
-        const candidates = await fetchRecipesForMeal(
-          mealSlot,
-          dailyCalories,
-          dietPref,
-          excludeIngredients,
-          includeIngredients,
-          targets.focusCategories
+      if (pool.length > 0) {
+        // Pick a random recipe from the pool for variety across days
+        const recipe = pool[Math.floor(Math.random() * pool.length)];
+        const actualCal = Number(recipe.Calories || 0);
+
+        meals.push({
+          mealType: mealSlot.mealType,
+          label: mealSlot.label,
+          time: mealSlot.time,
+          recipe,
+          targetCalories: targetCal,
+          actualCalories: actualCal,
+        });
+
+        dayTotalCal += actualCal;
+        dayTotalProtein += Number(recipe["Protein (g)"] || recipe["Protein"] || 0);
+        dayTotalCarbs += Number(
+          recipe["Carbohydrate, by difference (g)"] || recipe["Carbohydrate"] || 0
         );
-
-        if (candidates.length > 0) {
-          // Pick a random recipe from candidates to add variety across days
-          const recipe =
-            candidates[Math.floor(Math.random() * candidates.length)];
-          const actualCal = Number(recipe.Calories || 0);
-
-          meals.push({
-            mealType: mealSlot.mealType,
-            label: mealSlot.label,
-            time: mealSlot.time,
-            recipe,
-            targetCalories: targetCal,
-            actualCalories: actualCal,
-          });
-
-          dayTotalCal += actualCal;
-          dayTotalProtein += Number(recipe["Protein (g)"] || recipe["Protein"] || 0);
-          dayTotalCarbs += Number(
-            recipe["Carbohydrate, by difference (g)"] || recipe["Carbohydrate"] || 0
-          );
-          dayTotalFat += Number(recipe["Total lipid (fat) (g)"] || recipe["Fat"] || 0);
-        }
-      } catch (err) {
-        console.error(`Error generating meal ${mealSlot.label} for day ${d + 1}:`, err);
+        dayTotalFat += Number(recipe["Total lipid (fat) (g)"] || recipe["Fat"] || 0);
       }
     }
 
