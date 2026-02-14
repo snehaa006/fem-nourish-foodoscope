@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { PatientSidebar } from "./PatientSidebar";
 import { Outlet } from "react-router-dom";
+import NutritionChatbot from "@/components/chat/NutritionChatbot";
 
 const PatientLayout = () => {
   return (
@@ -17,6 +18,7 @@ const PatientLayout = () => {
           </main>
         </div>
       </div>
+      <NutritionChatbot />
     </SidebarProvider>
   );
 };
