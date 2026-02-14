@@ -996,74 +996,7 @@ const RecipeBuilder = () => {
           </CardContent>
         </Card>
 
-        {/* AI Generation Buttons */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">AI-Powered Plan Generation</CardTitle>
-            <p className="text-sm text-gray-600">Generate personalized diet plans using AI or Ayurvedic principles</p>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <Button 
-                onClick={handleGenerateAyurPlan} 
-                disabled={ayurLoading || !patientId.trim()}
-                className="gap-2 bg-green-600 hover:bg-green-700"
-              >
-                {ayurLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Leaf className="w-4 h-4" />
-                    Generate Ayurnutrigenomics Plan
-                  </>
-                )}
-              </Button>
-              {/* <Button 
-                onClick={handleGenerateAIPlan} 
-                disabled={loading || !patientId.trim()}
-                variant="outline"
-                className="gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Generate AI Plan
-                  </>
-                )}
-              </Button> */}
-            </div>
-          </CardContent>
-        </Card>
       </div>
-
-      {/* Render Ayurnutrigenomics Plan */}
-      {renderAyurPlan()}
-
-      {/* Render AI Plan */}
-      {aiPlan && (
-        <div className="mt-4 p-4 border rounded">
-          <h3 className="font-bold mb-2">AI Generated Plan</h3>
-          <pre className="text-sm bg-gray-50 p-2 rounded whitespace-pre-wrap">
-            {JSON.stringify(aiPlan, null, 2)}
-          </pre>
-          <div className="flex gap-2 mt-3">
-            <Button onClick={() => handleSavePlan("draft", "ai")} disabled={saving}>
-              {saving ? "Saving..." : "Save AI Draft"}
-            </Button>
-            <Button onClick={() => handleSavePlan("final", "ai")} disabled={saving}>
-              {saving ? "Saving..." : "Approve AI Plan"}
-            </Button>
-          </div>
-        </div>
-      )}
 
       <div className="flex gap-6">
         <DragDropContext onDragEnd={handleDragEnd}>
