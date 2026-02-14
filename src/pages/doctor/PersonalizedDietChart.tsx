@@ -17,6 +17,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -558,7 +559,7 @@ const PersonalizedDietChart: React.FC = () => {
           planDuration: `${numDays} days`,
           planType: "personalized-diet-chart",
           status,
-          createdBy: auth.currentUser?.uid,
+          createdBy: auth.currentUser?.uid || "",
           createdAt: serverTimestamp(),
           lastModified: serverTimestamp(),
           source: "personalized-diet-chart",
@@ -570,23 +571,28 @@ const PersonalizedDietChart: React.FC = () => {
           medicalNotes: dietChart.medicalNotes,
           excludedIngredients: dietChart.excludedIngredients,
           days: dietChart.days.map((day) => ({
-            ...day,
+            dayNumber: day.dayNumber,
+            dayLabel: day.dayLabel,
+            totalCalories: day.totalCalories,
+            totalProtein: day.totalProtein,
+            totalCarbs: day.totalCarbs,
+            totalFat: day.totalFat,
             meals: day.meals.map((meal) => ({
               mealType: meal.mealType,
               label: meal.label,
               time: meal.time,
               targetCalories: meal.targetCalories,
               actualCalories: meal.actualCalories,
-              recipeName: meal.recipe.Recipe_title,
-              recipeId: meal.recipe.Recipe_id || meal.recipe._id,
-              calories: meal.recipe.Calories,
-              protein: meal.recipe["Protein (g)"],
-              carbs: meal.recipe["Carbohydrate, by difference (g)"],
-              fat: meal.recipe["Total lipid (fat) (g)"],
-              region: meal.recipe.Region,
-              cookTime: meal.recipe.cook_time,
-              isVegan: meal.recipe.vegan,
-              isVegetarian: meal.recipe.lacto_vegetarian,
+              recipeName: meal.recipe.Recipe_title || "",
+              recipeId: meal.recipe.Recipe_id || meal.recipe._id || "",
+              calories: meal.recipe.Calories || 0,
+              protein: meal.recipe["Protein (g)"] || 0,
+              carbs: meal.recipe["Carbohydrate, by difference (g)"] || 0,
+              fat: meal.recipe["Total lipid (fat) (g)"] || 0,
+              region: meal.recipe.Region || "",
+              cookTime: meal.recipe.cook_time || "",
+              isVegan: meal.recipe.vegan || "0",
+              isVegetarian: meal.recipe.lacto_vegetarian || "0",
             })),
           })),
           generatedAt: dietChart.generatedAt,
@@ -1568,6 +1574,9 @@ const PersonalizedDietChart: React.FC = () => {
               <ChefHat className="w-5 h-5 text-green-600" />
               {selectedRecipe?.Recipe_title || "Recipe Details"}
             </DialogTitle>
+            <DialogDescription>
+              Full recipe details including nutrition, instructions, and diet information.
+            </DialogDescription>
           </DialogHeader>
 
           {isLoadingRecipeDetail ? (
@@ -1705,6 +1714,9 @@ const PersonalizedDietChart: React.FC = () => {
               <Sparkles className="w-5 h-5 text-amber-500" />
               Flavor Enhancement
             </DialogTitle>
+            <DialogDescription>
+              FlavorDB ingredient suggestions to enhance recipe flavor, filtered by patient restrictions.
+            </DialogDescription>
           </DialogHeader>
 
           <p className="text-sm text-gray-600 mb-3">
