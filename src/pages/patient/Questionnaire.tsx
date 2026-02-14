@@ -24,6 +24,17 @@ interface FormData {
   gender: string;
   location: string;
 
+  // Life Stage & Reproductive Health
+  lifeStage: string;
+  pregnancyTrimester: string;
+  isBreastfeeding: string;
+  menopauseStage: string;
+
+  // Allergies & Food Avoidances
+  allergies: string[];
+  allergiesOther: string;
+  foodAvoidances: string;
+
   // Lifestyle & Habits
   dailyRoutine: string;
   physicalActivity: string;
@@ -71,6 +82,13 @@ const AyurvedicHealthAssessment: React.FC = () => {
     dob: "",
     gender: "",
     location: "",
+    lifeStage: "not_applicable",
+    pregnancyTrimester: "",
+    isBreastfeeding: "",
+    menopauseStage: "",
+    allergies: [],
+    allergiesOther: "",
+    foodAvoidances: "",
     dailyRoutine: "",
     physicalActivity: "",
     sleepDuration: "",
@@ -397,6 +415,138 @@ const AyurvedicHealthAssessment: React.FC = () => {
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="E.g., San Francisco, CA"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Life Stage & Reproductive Health */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <HeartPulse className="w-6 h-6 text-green-700" />
+              <h2 className="text-xl font-semibold text-gray-800">
+                Life Stage & Reproductive Health
+              </h2>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Current life stage
+                </label>
+                <RadioGroup
+                  name="lifeStage"
+                  options={[
+                    { value: "not_applicable", label: "Not Applicable" },
+                    { value: "pregnancy", label: "Pregnancy" },
+                    { value: "postpartum", label: "Postpartum" },
+                    { value: "menopause", label: "Menopause" },
+                  ]}
+                  className="grid grid-cols-2 md:grid-cols-4 gap-2"
+                />
+              </div>
+
+              {formData.lifeStage === "pregnancy" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pregnancy trimester
+                  </label>
+                  <RadioGroup
+                    name="pregnancyTrimester"
+                    options={[
+                      { value: "first", label: "1st Trimester (1-12 weeks)" },
+                      { value: "second", label: "2nd Trimester (13-26 weeks)" },
+                      { value: "third", label: "3rd Trimester (27-40 weeks)" },
+                    ]}
+                  />
+                </div>
+              )}
+
+              {formData.lifeStage === "postpartum" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Are you currently breastfeeding?
+                  </label>
+                  <RadioGroup
+                    name="isBreastfeeding"
+                    options={[
+                      { value: "yes", label: "Yes" },
+                      { value: "no", label: "No" },
+                    ]}
+                  />
+                </div>
+              )}
+
+              {formData.lifeStage === "menopause" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Menopause stage
+                  </label>
+                  <RadioGroup
+                    name="menopauseStage"
+                    options={[
+                      { value: "perimenopause", label: "Perimenopause" },
+                      { value: "menopause", label: "Menopause" },
+                      { value: "postmenopause", label: "Postmenopause" },
+                    ]}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Allergies & Food Avoidances */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <Apple className="w-6 h-6 text-green-700" />
+              <h2 className="text-xl font-semibold text-gray-800">
+                Allergies & Food Avoidances
+              </h2>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Known food allergies (select all that apply)
+                </label>
+                <CheckboxGroup
+                  name="allergies"
+                  options={[
+                    { value: "dairy", label: "Dairy / Lactose" },
+                    { value: "gluten", label: "Gluten / Wheat" },
+                    { value: "nuts", label: "Tree Nuts" },
+                    { value: "peanuts", label: "Peanuts" },
+                    { value: "soy", label: "Soy" },
+                    { value: "eggs", label: "Eggs" },
+                    { value: "shellfish", label: "Shellfish" },
+                    { value: "fish", label: "Fish" },
+                    { value: "none", label: "None" },
+                  ]}
+                  mutualExclusive
+                />
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    name="allergiesOther"
+                    value={formData.allergiesOther}
+                    onChange={handleInputChange}
+                    placeholder="Other allergies (e.g., sesame, mustard)..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Foods to avoid (religious, personal, or medical reasons)
+                </label>
+                <textarea
+                  name="foodAvoidances"
+                  value={formData.foodAvoidances}
+                  onChange={handleInputChange}
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="E.g., beef, pork, alcohol, caffeine..."
                 />
               </div>
             </div>

@@ -18,10 +18,11 @@ import {
   Plus, 
   Search, 
   ChefHat, 
-  FileText, 
+  FileText,
   Settings,
   User,
-  LogOut
+  LogOut,
+  Leaf
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,11 @@ const navigationItems = [
     title: "Diet Charts",
     url: "/doctor/diet-charts",
     icon: FileText,
+  },
+  {
+    title: "Personalized Diet",
+    url: "/doctor/personalized-diet",
+    icon: Leaf,
   },
 ];
 
