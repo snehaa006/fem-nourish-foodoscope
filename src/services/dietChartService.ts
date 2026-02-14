@@ -667,6 +667,27 @@ async function fetchWithRetry<T>(
   }
 }
 
+// --- Estimate macros from calories when API doesn't return them ---
+
+function ensureMacros(recipe: RecipeBasic): RecipeBasic {
+  const cal = Number(recipe.Calories || recipe["Energy (kcal)"] || 0);
+  const hasProtein = recipe["Protein (g)"] && Number(recipe["Protein (g)"]) > 0;
+  const hasCarbs = recipe["Carbohydrate, by difference (g)"] && Number(recipe["Carbohydrate, by difference (g)"]) > 0;
+  const hasFat = recipe["Total lipid (fat) (g)"] && Number(recipe["Total lipid (fat) (g)"]) > 0;
+
+  if (!hasProtein && !hasCarbs && !hasFat && cal > 0) {
+    // Standard macro distribution: 20% protein, 50% carbs, 30% fat
+    return {
+      ...recipe,
+      "Protein (g)": String(Math.round((cal * 0.20 / 4) * 10) / 10),
+      "Carbohydrate, by difference (g)": String(Math.round((cal * 0.50 / 4) * 10) / 10),
+      "Total lipid (fat) (g)": String(Math.round((cal * 0.30 / 9) * 10) / 10),
+    };
+  }
+
+  return recipe;
+}
+
 // --- Fetch recipes for a single meal slot ---
 
 export async function fetchRecipesForMeal(
@@ -855,7 +876,7 @@ export async function generateDietChart(
 
       if (pool.length > 0) {
         // Pick a random recipe from the pool for variety across days
-        const recipe = pool[Math.floor(Math.random() * pool.length)];
+        const recipe = ensureMacros(pool[Math.floor(Math.random() * pool.length)]);
         const actualCal = Number(recipe.Calories || 0);
 
         meals.push({
