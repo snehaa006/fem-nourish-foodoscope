@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useApp } from "@/context/AppContext";
 // Firebase imports
 import { collection, query, orderBy, getDocs, doc, addDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -65,7 +66,8 @@ type SavedDietPlan = {
 
 const MealLogging = () => {
   const navigate = useNavigate();
-  
+  const { user } = useApp();
+
   // Patient search and diet plan state
   const [patientId, setPatientId] = useState("");
   const [patientName, setPatientName] = useState("");
@@ -144,8 +146,50 @@ const MealLogging = () => {
       });
     }
 
+    // Also handle PersonalizedDietChart days[] format
+    if (mealPlans.days && Array.isArray(mealPlans.days)) {
+      const todayIndex = new Date().getDay();
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const todayDay = mealPlans.days.find((d: any) =>
+        d.dayLabel?.toLowerCase().includes(dayNames[todayIndex].toLowerCase())
+      ) || mealPlans.days[0];
+
+      if (todayDay?.meals) {
+        for (const meal of todayDay.meals) {
+          const mType = meal.mealType === "breakfast" ? "breakfast"
+            : meal.mealType === "lunch" ? "lunch"
+            : meal.mealType === "dinner" ? "dinner"
+            : "snack";
+          meals.push({
+            id: `${mealCounter++}`,
+            type: mType as Meal["type"],
+            name: meal.recipeName || "Unknown Recipe",
+            time: meal.time || timeSlotMappings[mType.charAt(0).toUpperCase() + mType.slice(1)] || "12:00 PM",
+            calories: Math.round(meal.calories || meal.actualCalories || 0),
+            status: "pending",
+            preparation: `Prepare as needed`,
+            benefits: `${meal.protein || 0}g protein, ${meal.fat || 0}g fat, ${meal.carbs || 0}g carbs`,
+            quantity: `1 serving`,
+          });
+        }
+      }
+    }
+
     return meals;
   };
+
+  // Auto-load diet plans for authenticated patient
+  useEffect(() => {
+    if (user?.id && !patientId) {
+      setPatientId(user.id);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (patientId && patientId === user?.id) {
+      fetchDietPlans();
+    }
+  }, [patientId]);
 
   // Fetch saved diet plans for a patient
   const fetchDietPlans = async () => {
@@ -195,12 +239,16 @@ const MealLogging = () => {
   // Load a specific diet plan
   const loadDietPlan = (plan: SavedDietPlan) => {
     setSelectedPlan(plan);
-    setPatientName(plan.patientName);
-    
-    const meals = convertDietPlanToMeals(plan.meals, plan.activeFilter);
+    setPatientName(plan.patientName || user?.name || "");
+
+    // Handle both formats: days[] from PersonalizedDietChart and meals from RecipeBuilder
+    const planData = (plan as any);
+    const dataToConvert = planData.days ? { days: planData.days } : plan.meals;
+    const meals = convertDietPlanToMeals(dataToConvert, plan.activeFilter);
     setTodaysMeals(meals);
-    
-    toast.success(`Loaded diet plan from ${plan.createdAt.toDate().toLocaleDateString()}`);
+
+    const dateStr = plan.createdAt?.toDate ? plan.createdAt.toDate().toLocaleDateString() : "recent";
+    toast.success(`Loaded diet plan from ${dateStr}`);
   };
 
   // Update meal status
