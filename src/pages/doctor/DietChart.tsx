@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,25 +8,26 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
-  FileText, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Download, 
+import {
+  FileText,
+  Plus,
+  Edit,
+  Trash2,
+  Download,
   Clock,
   AlertCircle,
   CheckCircle,
   Search,
-  RefreshCw
+  RefreshCw,
+  FileEdit
 } from "lucide-react";
 import { toast } from "sonner";
 // Firebase imports
@@ -56,6 +58,7 @@ interface SavedDietPlan {
 }
 
 const DietChart = () => {
+  const navigate = useNavigate();
   const [patientId, setPatientId] = useState("");
   const [savedPlans, setSavedPlans] = useState<SavedDietPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<SavedDietPlan | null>(null);
@@ -86,87 +89,96 @@ const DietChart = () => {
   };
 
   // Convert Firebase meal plans to DietPlanRow format
-  const convertMealPlanToRows = (mealPlans: any, activeFilter: string = "Daily"): DietPlanRow[] => {
+  // Handles both RecipeBuilder format { Daily, Weekly } and PersonalizedDietChart format { days[] }
+  const convertMealPlanToRows = (plan: any, activeFilter: string = "Daily"): DietPlanRow[] => {
     const rows: DietPlanRow[] = [];
     let rowCounter = 1;
 
     const timeSlotMappings: { [key: string]: string } = {
       "Breakfast": "8:00 AM",
-      "Lunch": "12:30 PM", 
+      "breakfast": "8:00 AM",
+      "Lunch": "12:30 PM",
+      "lunch": "12:30 PM",
       "Dinner": "7:30 PM",
-      "Snack": "4:00 PM"
+      "dinner": "7:30 PM",
+      "Snack": "4:00 PM",
+      "mid_morning": "10:30 AM",
+      "afternoon_snack": "4:00 PM",
     };
 
-    if (activeFilter === "Daily" && mealPlans.Daily) {
-      Object.entries(mealPlans.Daily).forEach(([mealType, foods]: [string, any]) => {
-        if (Array.isArray(foods)) {
-          foods.forEach((food: any) => {
-            rows.push({
-              id: `${rowCounter++}`,
-              time: timeSlotMappings[mealType] || "9:00 AM",
-              meal: mealType,
-              foodItem: food.Food_Item || "Unknown Food",
-              preparation: food.preparation || `Prepare ${food.Food_Item} as needed`,
-              quantity: food.quantity || `1 serving (${food.Calories || 0} cal)`,
-              benefits: food.benefits || `Good source of nutrients: ${food.Protein || 0}g protein, ${food.Fat || 0}g fat, ${food.Carbs || 0}g carbs`,
-              doshaBalance: food.Dosha_Vata === "Pacifying" ? "vata" : 
-                           food.Dosha_Pitta === "Pacifying" ? "pitta" : 
-                           food.Dosha_Kapha === "Pacifying" ? "kapha" : "tridosh",
-              restrictions: food.restrictions || undefined
-            });
-          });
-        }
-      });
-    } else if (activeFilter === "Weekly" && mealPlans.Weekly) {
-      Object.entries(mealPlans.Weekly).forEach(([day, dayMeals]: [string, any]) => {
-        Object.entries(dayMeals).forEach(([mealType, foods]: [string, any]) => {
+    // Guard: if plan data is missing, return empty
+    if (!plan) return rows;
+
+    // RecipeBuilder format: { Daily: {...}, Weekly: {...} }
+    if (plan.Daily || plan.Weekly) {
+      if (activeFilter === "Daily" && plan.Daily) {
+        Object.entries(plan.Daily).forEach(([mealType, foods]: [string, any]) => {
           if (Array.isArray(foods)) {
             foods.forEach((food: any) => {
               rows.push({
                 id: `${rowCounter++}`,
                 time: timeSlotMappings[mealType] || "9:00 AM",
-                meal: `${day} ${mealType}`,
-                foodItem: food.Food_Item || "Unknown Food",
-                preparation: food.preparation || `Prepare ${food.Food_Item} as needed`,
-                quantity: food.quantity || `1 serving (${food.Calories || 0} cal)`,
-                benefits: food.benefits || `Good source of nutrients: ${food.Protein || 0}g protein, ${food.Fat || 0}g fat, ${food.Carbs || 0}g carbs`,
-                doshaBalance: food.Dosha_Vata === "Pacifying" ? "vata" : 
-                             food.Dosha_Pitta === "Pacifying" ? "pitta" : 
+                meal: mealType,
+                foodItem: food.Food_Item || food.recipeName || "Unknown Food",
+                preparation: food.preparation || `Prepare as needed`,
+                quantity: food.quantity || `1 serving (${food.Calories || food.calories || 0} cal)`,
+                benefits: `${food.Protein || food.protein || 0}g protein, ${food.Fat || food.fat || 0}g fat, ${food.Carbs || food.carbs || 0}g carbs`,
+                doshaBalance: food.Dosha_Vata === "Pacifying" ? "vata" :
+                             food.Dosha_Pitta === "Pacifying" ? "pitta" :
                              food.Dosha_Kapha === "Pacifying" ? "kapha" : "tridosh",
                 restrictions: food.restrictions || undefined
               });
             });
           }
         });
-      });
-    } else if (activeFilter === "Monthly" && mealPlans.Monthly) {
-      Object.entries(mealPlans.Monthly).forEach(([month, monthDays]: [string, any]) => {
-        if (Array.isArray(monthDays)) {
-          monthDays.forEach((dayData: any) => {
-            if (dayData.meals) {
-              Object.entries(dayData.meals).forEach(([mealType, foods]: [string, any]) => {
-                if (Array.isArray(foods)) {
-                  foods.forEach((food: any) => {
-                    rows.push({
-                      id: `${rowCounter++}`,
-                      time: timeSlotMappings[mealType] || "9:00 AM",
-                      meal: `${month} Day ${dayData.day} ${mealType}`,
-                      foodItem: food.Food_Item || "Unknown Food",
-                      preparation: food.preparation || `Prepare ${food.Food_Item} as needed`,
-                      quantity: food.quantity || `1 serving (${food.Calories || 0} cal)`,
-                      benefits: food.benefits || `Good source of nutrients: ${food.Protein || 0}g protein, ${food.Fat || 0}g fat, ${food.Carbs || 0}g carbs`,
-                      doshaBalance: food.Dosha_Vata === "Pacifying" ? "vata" : 
-                                   food.Dosha_Pitta === "Pacifying" ? "pitta" : 
-                                   food.Dosha_Kapha === "Pacifying" ? "kapha" : "tridosh",
-                      restrictions: food.restrictions || undefined
-                    });
-                  });
-                }
+      } else if (plan.Weekly) {
+        Object.entries(plan.Weekly).forEach(([day, dayMeals]: [string, any]) => {
+          Object.entries(dayMeals).forEach(([mealType, foods]: [string, any]) => {
+            if (Array.isArray(foods)) {
+              foods.forEach((food: any) => {
+                rows.push({
+                  id: `${rowCounter++}`,
+                  time: timeSlotMappings[mealType] || "9:00 AM",
+                  meal: `${day} — ${mealType}`,
+                  foodItem: food.Food_Item || food.recipeName || "Unknown Food",
+                  preparation: food.preparation || `Prepare as needed`,
+                  quantity: food.quantity || `1 serving (${food.Calories || food.calories || 0} cal)`,
+                  benefits: `${food.Protein || food.protein || 0}g protein, ${food.Fat || food.fat || 0}g fat, ${food.Carbs || food.carbs || 0}g carbs`,
+                  doshaBalance: food.Dosha_Vata === "Pacifying" ? "vata" :
+                               food.Dosha_Pitta === "Pacifying" ? "pitta" :
+                               food.Dosha_Kapha === "Pacifying" ? "kapha" : "tridosh",
+                  restrictions: food.restrictions || undefined
+                });
               });
             }
           });
-        }
-      });
+        });
+      }
+      return rows;
+    }
+
+    return rows;
+  };
+
+  // Convert personalized-diet-chart days[] format to rows
+  const convertDaysToRows = (days: any[]): DietPlanRow[] => {
+    const rows: DietPlanRow[] = [];
+    let rowCounter = 1;
+
+    for (const day of days) {
+      for (const meal of day.meals || []) {
+        rows.push({
+          id: `${rowCounter++}`,
+          time: meal.time || "—",
+          meal: `${day.dayLabel} — ${meal.label || meal.mealType}`,
+          foodItem: meal.recipeName || "Unknown Recipe",
+          preparation: `Prepare as needed`,
+          quantity: `1 serving (${meal.calories || meal.actualCalories || 0} cal)`,
+          benefits: `${meal.protein || 0}g protein, ${meal.fat || 0}g fat, ${meal.carbs || 0}g carbs`,
+          doshaBalance: "tridosh",
+          restrictions: undefined,
+        });
+      }
     }
 
     return rows;
@@ -217,11 +229,25 @@ const DietChart = () => {
     setPatientName(plan.patientName);
     setPlanDuration(plan.planDuration);
     setPlanType(plan.planType);
-    
-    const rows = convertMealPlanToRows(plan.meals, plan.activeFilter);
+
+    const planData = plan as any;
+    let rows: DietPlanRow[] = [];
+
+    if (planData.days && Array.isArray(planData.days)) {
+      // PersonalizedDietChart format: days[].meals[]
+      rows = convertDaysToRows(planData.days);
+    } else if (plan.meals) {
+      // RecipeBuilder format: { Daily, Weekly }
+      rows = convertMealPlanToRows(plan.meals, plan.activeFilter);
+    }
+
     setDietRows(rows);
-    
-    toast.success(`Loaded diet plan from ${plan.createdAt.toDate().toLocaleDateString()}`);
+
+    if (rows.length === 0) {
+      toast.info("Plan loaded but no meal rows could be extracted.");
+    } else {
+      toast.success(`Loaded diet plan with ${rows.length} meals`);
+    }
   };
 
   // Delete a diet plan
@@ -377,16 +403,25 @@ const DietChart = () => {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       onClick={() => loadDietPlan(plan)}
                       variant={selectedPlan?.id === plan.id ? "default" : "outline"}
                     >
                       {selectedPlan?.id === plan.id ? "Loaded" : "Load"}
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="destructive" 
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => navigate(`/doctor/recipes?editPlanId=${plan.id}&patientId=${patientId}`)}
+                    >
+                      <FileEdit className="w-3 h-3" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
                       onClick={() => deleteDietPlan(plan.id)}
                     >
                       <Trash2 className="w-4 h-4" />

@@ -96,9 +96,7 @@ import {
 import {
   searchRecipeById,
   getInstructionsByRecipeId,
-  getIngredientsByFlavor,
   type RecipeBasic,
-  type FlavorIngredient,
 } from "@/services/foodoscopeApi";
 
 // ==================== TYPES ====================
@@ -484,7 +482,7 @@ const PersonalizedDietChart: React.FC = () => {
     }
   }, []);
 
-  // --- Enhance flavor ---
+  // --- Enhance flavor (uses built-in Ayurvedic flavor data) ---
   const handleEnhanceFlavor = useCallback(async (recipe: RecipeBasic) => {
     setFlavorRecipeName(recipe.Recipe_title);
     setShowFlavorDialog(true);
@@ -495,46 +493,17 @@ const PersonalizedDietChart: React.FC = () => {
       const allSuggestions: FlavorSuggestion[] = [];
       const flavors = ["sweet", "sour", "bitter", "salty"] as const;
 
-      // Try the FlavorDB API first
-      let apiWorked = false;
-      const results = await Promise.all(
-        flavors.map(async (flavor) => {
-          try {
-            const res = await getIngredientsByFlavor(flavor, 1, 10);
-            const items = res?.data;
-            if (items && Array.isArray(items) && items.length > 0) {
-              apiWorked = true;
-              return items
-                .filter((item: FlavorIngredient) =>
-                  !excludeSet.has((item.ingredient || item.generic_name || "").toLowerCase())
-                )
-                .slice(0, 5)
-                .map((item: FlavorIngredient) => ({
-                  ingredient: item.generic_name || item.ingredient || "Unknown",
-                  flavor,
-                  category: item.FlavorDB_Category || item.Dietrx_Category || "General",
-                }));
-            }
-            return [];
-          } catch { return []; }
-        })
-      );
-      results.forEach((r) => allSuggestions.push(...r));
-
-      // Fallback to built-in Ayurvedic flavor data if API returned nothing
-      if (!apiWorked) {
-        for (const flavor of flavors) {
-          const fallbackItems = FLAVOR_FALLBACK[flavor] || [];
-          const filtered = fallbackItems
-            .filter((item) => !excludeSet.has(item.ingredient.toLowerCase()))
-            .slice(0, 5)
-            .map((item) => ({
-              ingredient: item.generic_name,
-              flavor,
-              category: item.category,
-            }));
-          allSuggestions.push(...filtered);
-        }
+      for (const flavor of flavors) {
+        const fallbackItems = FLAVOR_FALLBACK[flavor] || [];
+        const filtered = fallbackItems
+          .filter((item) => !excludeSet.has(item.ingredient.toLowerCase()))
+          .slice(0, 5)
+          .map((item) => ({
+            ingredient: item.generic_name,
+            flavor,
+            category: item.category,
+          }));
+        allSuggestions.push(...filtered);
       }
 
       setFlavorSuggestions(allSuggestions);
