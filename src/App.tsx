@@ -34,6 +34,7 @@ import Reminders from "./pages/patient/Reminders";
 import Settings from "./pages/patient/Settings";
 import DoctorProfile from "./pages/doctor/DoctorProfile";
 import ConsultDoctor from "./components/ConsultDoctor";
+import MealCompatibility from "./pages/patient/MealCompatibility";
 
 const queryClient = new QueryClient();
 
@@ -156,6 +157,7 @@ const AppRoutes = () => (
         <Route path="wellness" element={<div className="p-6">Wellness Tips - Coming Soon</div>} />
         <Route path="shopping" element={<div className="p-6">Shopping List - Coming Soon</div>} />
         <Route path="appointments" element={<AppointmentScheduler/>} />
+        <Route path="compatibility" element={<MealCompatibility />} />
         <Route path="reminders" element={<Reminders />} />
         <Route path="profile" element={<PatientProfile />} />
         <Route path="settings" element={<Settings />} />

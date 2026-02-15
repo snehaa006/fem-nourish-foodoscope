@@ -34,6 +34,7 @@ import {
   Baby,
   Flower2,
   User,
+  FlaskConical,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -123,7 +124,7 @@ interface RecipeViewData {
   instructions: string;
 }
 
-type TabId = "today" | "plan" | "create" | "progress";
+type TabId = "today" | "plan" | "create" | "progress" | "compatibility";
 
 // ──────────────────────────────────────────────
 // Constants
@@ -812,6 +813,7 @@ const PatientDashboard = () => {
             { id: "plan" as TabId, label: "My Plans", icon: Calendar },
             { id: "create" as TabId, label: "Create Plan", icon: Filter },
             { id: "progress" as TabId, label: "Progress", icon: TrendingUp },
+            { id: "compatibility" as TabId, label: "Compatibility", icon: FlaskConical },
           ]).map(tab => {
             const Icon = tab.icon;
             return (
@@ -1440,6 +1442,125 @@ const PatientDashboard = () => {
                     </div>
                   );
                 })()}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* ── COMPATIBILITY TAB ── */}
+      {activeTab === "compatibility" && (
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="py-6">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center">
+                  <FlaskConical className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Food Compatibility Intelligence Engine</h3>
+                  <p className="text-muted-foreground mt-1 max-w-lg mx-auto">
+                    Analyze how foods interact when eaten together. Based on Ayurvedic Viruddha Ahara principles
+                    and modern nutritional science, powered by FoodOscope Recipe &amp; FlavorDB APIs.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">
+                    3D Anatomical Visualization
+                  </Badge>
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                    15 Compatibility Rules
+                  </Badge>
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                    118,083 Recipes Database
+                  </Badge>
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                    FlavorDB Molecules
+                  </Badge>
+                </div>
+                <Button
+                  className="bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-700 hover:to-purple-700 text-white"
+                  onClick={() => navigate("/patient/compatibility")}
+                >
+                  <FlaskConical className="w-4 h-4 mr-2" />
+                  Open Compatibility Analyzer
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <span className="text-lg">🧬</span> How It Works
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ol className="space-y-2 text-xs text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="bg-emerald-100 text-emerald-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0">1</span>
+                    Search and select 2-5 foods from our database
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="bg-emerald-100 text-emerald-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0">2</span>
+                    Our engine fetches nutritional data via FoodOscope API
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="bg-emerald-100 text-emerald-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0">3</span>
+                    15 compatibility rules analyze nutrient interactions
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="bg-emerald-100 text-emerald-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0">4</span>
+                    View affected organs on the 3D anatomical model
+                  </li>
+                </ol>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <span className="text-lg">📡</span> APIs Used
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="p-2 rounded bg-cyan-50 border border-cyan-100">
+                  <p className="text-xs font-semibold text-cyan-800">FoodOscope Recipe2 API</p>
+                  <p className="text-xs text-cyan-600 mt-0.5">118,083 recipes with full nutritional profiles, ingredients, and cooking processes</p>
+                </div>
+                <div className="p-2 rounded bg-purple-50 border border-purple-100">
+                  <p className="text-xs font-semibold text-purple-800">FoodOscope FlavorDB API</p>
+                  <p className="text-xs text-purple-600 mt-0.5">Flavor molecules, entity categories, and compound analysis for ingredients</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <span className="text-lg">⚖️</span> Example Interactions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-xs">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">✅</span>
+                    <span><strong>Spinach + Lemon</strong> — Iron absorption enhanced 3-5x by vitamin C</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">✅</span>
+                    <span><strong>Turmeric + Black Pepper</strong> — Curcumin bioavailability up 2000%</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-500 mt-0.5">⚠️</span>
+                    <span><strong>Milk + Citrus</strong> — Acid curdles proteins, creating digestive issues</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-red-500 mt-0.5">⚠️</span>
+                    <span><strong>Fish + Dairy</strong> — Conflicting digestion patterns (Viruddha Ahara)</span>
+                  </li>
+                </ul>
               </CardContent>
             </Card>
           </div>

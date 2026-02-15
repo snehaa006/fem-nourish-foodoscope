@@ -1,0 +1,2297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FemNourish - Food Compatibility Intelligence Engine</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg-primary: #0a0e27;
+    --bg-secondary: #111638;
+    --bg-tertiary: #161b45;
+    --bg-card: #1a1f4a;
+    --bg-card-hover: #1f2555;
+    --cyan: #22d3ee;
+    --cyan-dim: rgba(34, 211, 238, 0.3);
+    --cyan-glow: rgba(34, 211, 238, 0.15);
+    --purple: #a78bfa;
+    --purple-dim: rgba(167, 139, 250, 0.3);
+    --green: #10b981;
+    --green-dim: rgba(16, 185, 129, 0.15);
+    --red: #f87171;
+    --red-dim: rgba(248, 113, 113, 0.15);
+    --amber: #fbbf24;
+    --amber-dim: rgba(251, 191, 36, 0.15);
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border: rgba(34, 211, 238, 0.12);
+    --border-strong: rgba(34, 211, 238, 0.25);
+}
+
+html, body {
+    width: 100%; height: 100%;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(135deg, var(--bg-primary) 0%, #1a0b2e 50%, var(--bg-primary) 100%);
+    color: var(--text-primary);
+    overflow: hidden;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--cyan-dim); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+.title-bar {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(90deg, rgba(34,211,238,0.05) 0%, rgba(167,139,250,0.08) 50%, rgba(34,211,238,0.05) 100%);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-secondary);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+.title-bar span { color: var(--cyan); font-weight: 600; }
+
+.app-container {
+    display: grid;
+    grid-template-columns: 320px 1fr 400px;
+    height: calc(100vh - 36px);
+    gap: 0;
+}
+
+/* LEFT PANEL */
+.panel-left {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.panel-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+}
+.panel-header h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cyan);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.panel-header p {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.search-container {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.search-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px var(--cyan-glow);
+}
+.search-input::placeholder { color: var(--text-muted); }
+
+.search-results {
+    max-height: 240px;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--border);
+}
+.search-result-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    transition: background 0.15s;
+}
+.search-result-item:hover { background: var(--bg-card); }
+.search-result-item .name {
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.search-result-item .meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+.search-loading {
+    padding: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.selected-foods {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+}
+.selected-header {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+.selected-food-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    position: relative;
+}
+.selected-food-card .food-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    padding-right: 24px;
+}
+.selected-food-card .food-detail {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+.selected-food-card .remove-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(248,113,113,0.15);
+    color: var(--red);
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+.selected-food-card .remove-btn:hover { background: rgba(248,113,113,0.3); }
+
+.panel-actions {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+.btn-primary {
+    background: linear-gradient(135deg, var(--cyan), #06b6d4);
+    color: var(--bg-primary);
+    font-weight: 600;
+}
+.btn-primary:hover { box-shadow: 0 0 20px var(--cyan-glow); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-secondary {
+    background: var(--bg-card);
+    color: var(--purple);
+    border: 1px solid var(--purple-dim);
+}
+.btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--purple); }
+
+/* CENTER PANEL */
+.panel-center {
+    position: relative;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+#three-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+.organ-legend {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    background: rgba(10, 14, 39, 0.85);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    backdrop-filter: blur(8px);
+}
+.legend-title {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+.legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.model-tooltip {
+    position: absolute;
+    display: none;
+    background: rgba(10, 14, 39, 0.92);
+    border: 1px solid var(--cyan);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-primary);
+    pointer-events: none;
+    z-index: 100;
+    max-width: 220px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(34, 211, 238, 0.15);
+}
+.model-tooltip .tt-title {
+    font-weight: 600;
+    color: var(--cyan);
+    margin-bottom: 4px;
+}
+.model-tooltip .tt-effect {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.model-status {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    font-size: 10px;
+    color: var(--text-muted);
+    background: rgba(10,14,39,0.7);
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+/* RIGHT PANEL */
+.panel-right {
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.analysis-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 40px;
+}
+.analysis-placeholder .icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+.analysis-placeholder h3 {
+    color: var(--text-secondary);
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+.analysis-placeholder p {
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.6;
+    max-width: 280px;
+}
+
+/* Analysis Results Styles */
+.analysis-content { padding: 0; }
+
+.score-section {
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(34,211,238,0.06) 0%, rgba(167,139,250,0.06) 100%);
+    border-bottom: 1px solid var(--border);
+}
+.score-top {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 10px;
+}
+.score-number {
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+}
+.score-bar-container { flex: 1; }
+.score-label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.score-bar {
+    height: 8px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.score-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s ease;
+}
+.score-summary {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.section-block {
+    border-bottom: 1px solid var(--border);
+}
+.section-title {
+    padding: 14px 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+}
+.section-title:hover { background: rgba(255,255,255,0.02); }
+.section-title .chevron {
+    margin-left: auto;
+    font-size: 10px;
+    transition: transform 0.2s;
+    color: var(--text-muted);
+}
+.section-title.collapsed .chevron { transform: rotate(-90deg); }
+.section-body { padding: 0 20px 16px; }
+.section-body.hidden { display: none; }
+
+.section-title.beneficial { color: var(--green); }
+.section-title.concerns { color: var(--red); }
+.section-title.flavor { color: var(--purple); }
+.section-title.methodology { color: var(--cyan); }
+.section-title.datasource { color: var(--amber); }
+
+.rule-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+.rule-card.positive { border-left: 3px solid var(--green); }
+.rule-card.negative { border-left: 3px solid var(--red); }
+
+.rule-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.rule-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.rule-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.rule-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.tag {
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.tag-science {
+    background: rgba(34,211,238,0.12);
+    color: var(--cyan);
+}
+.tag-ayurveda {
+    background: rgba(167,139,250,0.12);
+    color: var(--purple);
+}
+.tag-category {
+    background: rgba(148,163,184,0.1);
+    color: var(--text-secondary);
+}
+.rule-organ {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.rule-divider {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+    padding: 6px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    margin: 8px 0;
+}
+
+.threshold-text {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    padding: 6px 10px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+}
+
+.values-table {
+    background: rgba(0,0,0,0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 8px 0;
+}
+.values-food {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.values-food:last-child { border-bottom: none; }
+.values-food-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--cyan);
+    margin-bottom: 4px;
+}
+.values-food-row {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: 'Courier New', monospace;
+    padding: 1px 0;
+}
+.values-total {
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.03);
+    font-size: 11px;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.values-total .check { color: var(--green); }
+.values-total .cross { color: var(--red); }
+
+.mechanism-text {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    padding: 6px 0;
+}
+
+.score-impact {
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin: 6px 0;
+}
+.score-impact.positive { background: var(--green-dim); color: var(--green); }
+.score-impact.negative { background: var(--red-dim); color: var(--red); }
+
+.api-source {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    line-height: 1.5;
+}
+
+/* Flavor section */
+.flavor-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--purple);
+}
+.flavor-entity-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--purple);
+    margin-bottom: 2px;
+}
+.flavor-category {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+.flavor-detail {
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 2px 0;
+}
+.flavor-none {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 10px 0;
+}
+
+/* Methodology section */
+.method-table {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    width: 100%;
+    line-height: 1.7;
+}
+.method-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 10px;
+}
+.method-row.header {
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+    padding-bottom: 6px;
+}
+.method-row.positive-row { color: var(--green); }
+.method-row.negative-row { color: var(--red); }
+.method-row.divider {
+    border-top: 1px dashed rgba(255,255,255,0.08);
+    margin: 4px 0;
+    padding: 0;
+}
+.method-row.total { color: var(--text-primary); font-weight: 600; }
+.method-row.final {
+    color: var(--cyan);
+    font-weight: 700;
+    font-size: 12px;
+    border-top: 1px solid var(--border-strong);
+    padding-top: 6px;
+    margin-top: 4px;
+}
+.method-formula {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'Courier New', monospace;
+    line-height: 1.6;
+}
+
+/* Data source section */
+.datasource-block {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+.datasource-title {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.datasource-url {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'Courier New', monospace;
+    margin-bottom: 8px;
+    word-break: break-all;
+}
+.datasource-detail {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    padding: 1px 0;
+}
+.datasource-disclaimer {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--amber-dim);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--amber);
+    line-height: 1.5;
+}
+
+/* Status messages */
+.status-msg {
+    padding: 12px 16px;
+    font-size: 12px;
+    text-align: center;
+    color: var(--text-muted);
+}
+.status-msg.error {
+    color: var(--red);
+    background: var(--red-dim);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .app-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 400px 1fr;
+    }
+    .panel-left {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: 300px;
+    }
+    .panel-right {
+        border-left: none;
+        border-top: 1px solid var(--border);
+    }
+    .search-results { max-height: 120px; }
+}
+</style>
+</head>
+<body>
+
+<div class="title-bar">
+    <span>FemNourish</span>&nbsp;&mdash; Food Compatibility Intelligence Engine
+</div>
+
+<div class="app-container">
+    <!-- LEFT PANEL: Food Selection -->
+    <div class="panel-left">
+        <div class="panel-header">
+            <h2>Food Selection</h2>
+            <p>Search and add foods to analyze compatibility</p>
+        </div>
+        <div class="search-container">
+            <input type="text" class="search-input" id="food-search" placeholder="Search foods (e.g. salmon, rice, salad...)" autocomplete="off">
+        </div>
+        <div class="search-results" id="search-results"></div>
+        <div class="selected-foods" id="selected-foods">
+            <div class="selected-header">Selected Foods (0/6)</div>
+        </div>
+        <div class="panel-actions">
+            <button class="btn btn-secondary" id="demo-btn" onclick="loadDemoFoods()">Load Demo Foods</button>
+            <button class="btn btn-primary" id="calculate-btn" onclick="calculateCompatibility()" disabled>Analyze Compatibility</button>
+        </div>
+    </div>
+
+    <!-- CENTER PANEL: 3D Model -->
+    <div class="panel-center">
+        <canvas id="three-canvas"></canvas>
+        <div class="model-status" id="model-status">Rotate: Left click | Zoom: Scroll | Pan: Right click</div>
+        <div class="organ-legend" id="organ-legend">
+            <div class="legend-title">Organ Map</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#e879a0"></div> Brain - Cognitive Effects</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#c77840"></div> Liver - Detoxification</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#e8c847"></div> Stomach - Digestion</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#e89040"></div> Intestines - Absorption</div>
+        </div>
+        <div class="model-tooltip" id="model-tooltip">
+            <div class="tt-title"></div>
+            <div class="tt-effect"></div>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: Analysis Results -->
+    <div class="panel-right" id="analysis-panel">
+        <div class="analysis-placeholder" id="analysis-placeholder">
+            <div class="icon">&#9878;</div>
+            <h3>Compatibility Analysis</h3>
+            <p>Select 2 or more foods and click "Analyze Compatibility" to see detailed food interaction analysis based on Ayurvedic principles and nutritional science.</p>
+        </div>
+        <div class="analysis-content" id="analysis-content" style="display:none;"></div>
+    </div>
+</div>
+
+<script>
+// ======================== API CONFIGURATION ========================
+const RECIPE_API_BASE = 'https://api.foodoscope.com/recipe2-api';
+const RECIPE_TOKEN = 'usYgoaB4a9Xv-rrs6WPz9a9dfUktdm3yOe4FNoZWOH4n-qyB';
+const FLAVORDB_API_BASE = 'https://api.foodoscope.com/flavordb';
+const FLAVORDB_TOKEN = 'OOOFTMdKoOp3uAUM2QXt_0ibrAybF6JMs-cIT4XvijBwhpfk';
+
+// ======================== STATE ========================
+let selectedFoods = [];
+let analysisResults = null;
+let organEffects = {};
+let flavorData = {};
+
+// ======================== COMPATIBILITY RULES ========================
+const compatibilityRules = [
+    {
+        id: 'milk_citrus',
+        name: 'Dairy + Citrus/Acid Conflict',
+        category: 'Samyoga Viruddha',
+        type: 'ayurveda',
+        organ: 'stomach',
+        effect: 'negative',
+        intensity: 0.85,
+        threshold: 'Dairy + Acidic ingredients in same meal',
+        mechanism: 'Citric acid causes dairy proteins (casein) to curdle in the stomach, forming indigestible clumps that slow gastric emptying, cause bloating, and reduce nutrient absorption efficiency.',
+        check: function(foods) {
+            const allIngredients = foods.flatMap(f => f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || []);
+            const hasDairy = allIngredients.some(i => /milk|cream|yogurt|cheese|paneer|dairy|curd|butter|ghee/.test(i));
+            const hasAcid = allIngredients.some(i => /lemon|lime|orange|citrus|vinegar|tamarind|tomato|grapefruit|pineapple/.test(i));
+            return hasDairy && hasAcid;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], dairyItems: [], acidItems: [] };
+            foods.forEach(f => {
+                const ings = f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || [];
+                const dairy = ings.filter(i => /milk|cream|yogurt|cheese|paneer|dairy|curd|butter|ghee/.test(i));
+                const acid = ings.filter(i => /lemon|lime|orange|citrus|vinegar|tamarind|tomato|grapefruit|pineapple/.test(i));
+                if (dairy.length || acid.length) {
+                    data.perFood.push({ name: f.title || f.name, dairy, acid });
+                }
+                data.dairyItems.push(...dairy);
+                data.acidItems.push(...acid);
+            });
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'ingredients[]' };
+            return data;
+        }
+    },
+    {
+        id: 'milk_salt',
+        name: 'Dairy + High Sodium',
+        category: 'Samyoga Viruddha',
+        type: 'ayurveda',
+        organ: 'heart',
+        effect: 'negative',
+        intensity: 0.6,
+        threshold: 'Sodium > 400 mg with dairy',
+        mechanism: 'High sodium intake combined with dairy disrupts calcium-sodium balance in cells, potentially increasing blood pressure and reducing the cardioprotective benefits of calcium from dairy.',
+        check: function(foods) {
+            const allIngredients = foods.flatMap(f => f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || []);
+            const hasDairy = allIngredients.some(i => /milk|cream|yogurt|cheese|paneer|dairy/.test(i));
+            const totalSodium = foods.reduce((sum, f) => sum + (parseFloat(f.Sodium || f.sodium || 0)), 0);
+            return hasDairy && totalSodium > 400;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalSodium: 0 };
+            foods.forEach(f => {
+                const sodium = parseFloat(f.Sodium || f.sodium || 0);
+                const ings = f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || [];
+                const dairy = ings.filter(i => /milk|cream|yogurt|cheese|paneer|dairy/.test(i));
+                data.perFood.push({ name: f.title || f.name, sodium: sodium.toFixed(2), dairyItems: dairy });
+                data.totalSodium += sodium;
+            });
+            data.totalSodium = data.totalSodium.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Sodium(mg), ingredients[]' };
+            return data;
+        }
+    },
+    {
+        id: 'honey_heat',
+        name: 'Honey + Heat Processing',
+        category: 'Samskara Viruddha',
+        type: 'ayurveda',
+        organ: 'liver',
+        effect: 'negative',
+        intensity: 0.75,
+        threshold: 'Honey detected in heated/cooked recipe',
+        mechanism: 'Heating honey above 40C produces hydroxymethylfurfural (HMF), a compound that increases oxidative stress on hepatocytes. Ayurveda considers heated honey (ama) toxic due to molecular structure changes.',
+        check: function(foods) {
+            const allIngredients = foods.flatMap(f => f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || []);
+            const hasHoney = allIngredients.some(i => /honey/.test(i));
+            const allProcesses = foods.flatMap(f => f.Processes?.map(p => p.toLowerCase()) || []);
+            const hasHeat = allProcesses.some(p => /heat|cook|bake|roast|fry|boil|grill|saute|toast|broil/.test(p));
+            return hasHoney && hasHeat;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], honeyFoods: [], heatedProcesses: [] };
+            foods.forEach(f => {
+                const ings = f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || [];
+                const honey = ings.filter(i => /honey/.test(i));
+                const procs = f.Processes?.filter(p => /heat|cook|bake|roast|fry|boil|grill|saute|toast|broil/i.test(p)) || [];
+                data.perFood.push({ name: f.title || f.name, honeyItems: honey, processes: procs });
+                data.honeyFoods.push(...honey);
+                data.heatedProcesses.push(...procs);
+            });
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'ingredients[], Processes[]' };
+            return data;
+        }
+    },
+    {
+        id: 'fish_milk',
+        name: 'Fish + Dairy Combination',
+        category: 'Veerya Viruddha',
+        type: 'ayurveda',
+        organ: 'stomach',
+        effect: 'negative',
+        intensity: 0.8,
+        threshold: 'Fish protein + Dairy protein in combination',
+        mechanism: 'Fish and dairy have opposing thermal potencies (veerya). Fish is heating while milk is cooling, creating digestive conflict. Modern science notes both are complete proteins competing for the same digestive enzymes, slowing digestion.',
+        check: function(foods) {
+            const allIngredients = foods.flatMap(f => f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || []);
+            const hasFish = allIngredients.some(i => /fish|salmon|tuna|cod|seafood|shrimp|prawn|mackerel|sardine|trout/.test(i));
+            const hasDairy = allIngredients.some(i => /milk|cream|yogurt|cheese|paneer|dairy|curd/.test(i));
+            return hasFish && hasDairy;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], fishItems: [], dairyItems: [] };
+            foods.forEach(f => {
+                const ings = f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || [];
+                const fish = ings.filter(i => /fish|salmon|tuna|cod|seafood|shrimp|prawn|mackerel|sardine|trout/.test(i));
+                const dairy = ings.filter(i => /milk|cream|yogurt|cheese|paneer|dairy|curd/.test(i));
+                data.perFood.push({ name: f.title || f.name, fishItems: fish, dairyItems: dairy });
+                data.fishItems.push(...fish);
+                data.dairyItems.push(...dairy);
+            });
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'ingredients[]' };
+            return data;
+        }
+    },
+    {
+        id: 'heavy_then_fruit',
+        name: 'Heavy Meal + Fruit Combination',
+        category: 'Kala Viruddha',
+        type: 'ayurveda',
+        organ: 'stomach',
+        effect: 'negative',
+        intensity: 0.65,
+        threshold: 'Fat > 30g or Protein > 35g with fruit',
+        mechanism: 'Fruits digest rapidly (30-60 min) while heavy proteins/fats take 3-5 hours. Consuming them together causes fruit to ferment in the stomach while waiting, producing gas, bloating, and reducing nutrient absorption.',
+        check: function(foods) {
+            const totalFat = foods.reduce((s, f) => s + parseFloat(f['Total lipid (fat)(g)'] || f.fat || 0), 0);
+            const totalProtein = foods.reduce((s, f) => s + parseFloat(f['Protein(g)'] || f.protein || 0), 0);
+            const allIngredients = foods.flatMap(f => f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || []);
+            const hasFruit = allIngredients.some(i => /banana|apple|mango|orange|berry|fruit|grape|pear|peach|melon|papaya|kiwi|strawberr|blueberr|raspberr/.test(i));
+            return (totalFat > 30 || totalProtein > 35) && hasFruit;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalFat: 0, totalProtein: 0, fruitItems: [] };
+            foods.forEach(f => {
+                const fat = parseFloat(f['Total lipid (fat)(g)'] || f.fat || 0);
+                const protein = parseFloat(f['Protein(g)'] || f.protein || 0);
+                const ings = f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || [];
+                const fruits = ings.filter(i => /banana|apple|mango|orange|berry|fruit|grape|pear|peach|melon|papaya|kiwi|strawberr|blueberr|raspberr/.test(i));
+                data.perFood.push({ name: f.title || f.name, fat: fat.toFixed(2), protein: protein.toFixed(2), fruits });
+                data.totalFat += fat;
+                data.totalProtein += protein;
+                data.fruitItems.push(...fruits);
+            });
+            data.totalFat = data.totalFat.toFixed(2);
+            data.totalProtein = data.totalProtein.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Total lipid (fat)(g), Protein(g), ingredients[]' };
+            return data;
+        }
+    },
+    {
+        id: 'heavy_protein_carb',
+        name: 'High Protein + High Carb Overload',
+        category: 'Matra Viruddha',
+        type: 'ayurveda',
+        organ: 'stomach',
+        effect: 'negative',
+        intensity: 0.7,
+        threshold: 'Combined Protein > 50g AND Carbs > 100g',
+        mechanism: 'Concentrated proteins require acidic digestive environment (pepsin) while starches require alkaline (ptyalin). Consuming large amounts together neutralizes both environments, significantly slowing digestion and causing fermentation.',
+        check: function(foods) {
+            const totalProtein = foods.reduce((s, f) => s + parseFloat(f['Protein(g)'] || f.protein || 0), 0);
+            const totalCarbs = foods.reduce((s, f) => s + parseFloat(f['Carbohydrate, by difference(g)'] || f.carbs || 0), 0);
+            return totalProtein > 50 && totalCarbs > 100;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalProtein: 0, totalCarbs: 0 };
+            foods.forEach(f => {
+                const protein = parseFloat(f['Protein(g)'] || f.protein || 0);
+                const carbs = parseFloat(f['Carbohydrate, by difference(g)'] || f.carbs || 0);
+                data.perFood.push({ name: f.title || f.name, protein: protein.toFixed(2), carbs: carbs.toFixed(2) });
+                data.totalProtein += protein;
+                data.totalCarbs += carbs;
+            });
+            data.totalProtein = data.totalProtein.toFixed(2);
+            data.totalCarbs = data.totalCarbs.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Protein(g), Carbohydrate, by difference(g)' };
+            return data;
+        }
+    },
+    {
+        id: 'iron_vitamin_c',
+        name: 'Iron + Vitamin C Synergy',
+        category: 'Absorption Synergy',
+        type: 'science',
+        organ: 'intestines',
+        effect: 'positive',
+        intensity: 0.85,
+        threshold: 'Iron > 2 mg AND Vitamin C > 15 mg',
+        mechanism: 'Ascorbic acid (Vitamin C) converts non-heme ferric iron (Fe3+) to the more absorbable ferrous form (Fe2+) in the duodenum, increasing iron bioavailability by 2-6 fold. Essential for preventing iron deficiency.',
+        check: function(foods) {
+            const totalIron = foods.reduce((s, f) => s + parseFloat(f['Iron, Fe(mg)'] || f.iron || 0), 0);
+            const totalVitC = foods.reduce((s, f) => s + parseFloat(f['Vitamin C, total ascorbic acid(mg)'] || f.vitC || 0), 0);
+            return totalIron > 2 && totalVitC > 15;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalIron: 0, totalVitC: 0 };
+            foods.forEach(f => {
+                const iron = parseFloat(f['Iron, Fe(mg)'] || f.iron || 0);
+                const vitC = parseFloat(f['Vitamin C, total ascorbic acid(mg)'] || f.vitC || 0);
+                data.perFood.push({ name: f.title || f.name, iron: iron.toFixed(2), vitC: vitC.toFixed(2) });
+                data.totalIron += iron;
+                data.totalVitC += vitC;
+            });
+            data.totalIron = data.totalIron.toFixed(2);
+            data.totalVitC = data.totalVitC.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Iron, Fe(mg); Vitamin C, total ascorbic acid(mg)' };
+            return data;
+        }
+    },
+    {
+        id: 'turmeric_pepper',
+        name: 'Turmeric + Black Pepper Synergy',
+        category: 'Bioavailability Synergy',
+        type: 'science',
+        organ: 'intestines',
+        effect: 'positive',
+        intensity: 0.95,
+        threshold: 'Turmeric + Black pepper/piperine detected',
+        mechanism: 'Piperine in black pepper inhibits hepatic and intestinal glucuronidation of curcumin, increasing its bioavailability by up to 2000%. This is one of the most powerful food synergies known to nutritional science.',
+        check: function(foods) {
+            const allIngredients = foods.flatMap(f => f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || []);
+            const hasTurmeric = allIngredients.some(i => /turmeric|curcumin|haldi/.test(i));
+            const hasPepper = allIngredients.some(i => /black pepper|piperine|pepper/.test(i));
+            return hasTurmeric && hasPepper;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], turmericItems: [], pepperItems: [] };
+            foods.forEach(f => {
+                const ings = f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || [];
+                const turmeric = ings.filter(i => /turmeric|curcumin|haldi/.test(i));
+                const pepper = ings.filter(i => /black pepper|piperine|pepper/.test(i));
+                data.perFood.push({ name: f.title || f.name, turmericItems: turmeric, pepperItems: pepper });
+                data.turmericItems.push(...turmeric);
+                data.pepperItems.push(...pepper);
+            });
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'ingredients[]' };
+            return data;
+        }
+    },
+    {
+        id: 'high_fiber',
+        name: 'High Dietary Fiber',
+        category: 'Digestive Health',
+        type: 'science',
+        organ: 'intestines',
+        effect: 'positive',
+        intensity: 0.75,
+        threshold: 'Total dietary fiber > 15g',
+        mechanism: 'Adequate dietary fiber promotes healthy gut motility, feeds beneficial gut bacteria (prebiotic effect), improves nutrient absorption surface area, and helps maintain stable blood glucose through slower carbohydrate digestion.',
+        check: function(foods) {
+            const totalFiber = foods.reduce((s, f) => s + parseFloat(f['Fiber, total dietary(g)'] || f.fiber || 0), 0);
+            return totalFiber > 15;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalFiber: 0 };
+            foods.forEach(f => {
+                const fiber = parseFloat(f['Fiber, total dietary(g)'] || f.fiber || 0);
+                data.perFood.push({ name: f.title || f.name, fiber: fiber.toFixed(2) });
+                data.totalFiber += fiber;
+            });
+            data.totalFiber = data.totalFiber.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Fiber, total dietary(g)' };
+            return data;
+        }
+    },
+    {
+        id: 'fat_vitamin_absorption',
+        name: 'Fat + Fat-Soluble Vitamin Synergy',
+        category: 'Absorption Synergy',
+        type: 'science',
+        organ: 'intestines',
+        effect: 'positive',
+        intensity: 0.8,
+        threshold: 'Fat > 8g with fat-soluble vitamins present',
+        mechanism: 'Vitamins A, D, E, and K are lipophilic and require dietary fat for absorption via micelle formation in the small intestine. Without adequate fat, these essential vitamins pass through the GI tract unabsorbed.',
+        check: function(foods) {
+            const totalFat = foods.reduce((s, f) => s + parseFloat(f['Total lipid (fat)(g)'] || f.fat || 0), 0);
+            const totalVitA = foods.reduce((s, f) => s + parseFloat(f['Vitamin A, RAE(mcg)'] || f.vitA || 0), 0);
+            const totalVitE = foods.reduce((s, f) => s + parseFloat(f['Vitamin E (alpha-tocopherol)(mg)'] || f.vitE || 0), 0);
+            const totalVitD = foods.reduce((s, f) => s + parseFloat(f['Vitamin D(IU)'] || f.vitD || 0), 0);
+            return totalFat > 8 && (totalVitA > 100 || totalVitE > 2 || totalVitD > 50);
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalFat: 0, totalVitA: 0, totalVitE: 0, totalVitD: 0 };
+            foods.forEach(f => {
+                const fat = parseFloat(f['Total lipid (fat)(g)'] || f.fat || 0);
+                const vitA = parseFloat(f['Vitamin A, RAE(mcg)'] || f.vitA || 0);
+                const vitE = parseFloat(f['Vitamin E (alpha-tocopherol)(mg)'] || f.vitE || 0);
+                const vitD = parseFloat(f['Vitamin D(IU)'] || f.vitD || 0);
+                data.perFood.push({ name: f.title || f.name, fat: fat.toFixed(2), vitA: vitA.toFixed(2), vitE: vitE.toFixed(2), vitD: vitD.toFixed(2) });
+                data.totalFat += fat;
+                data.totalVitA += vitA;
+                data.totalVitE += vitE;
+                data.totalVitD += vitD;
+            });
+            data.totalFat = data.totalFat.toFixed(2);
+            data.totalVitA = data.totalVitA.toFixed(2);
+            data.totalVitE = data.totalVitE.toFixed(2);
+            data.totalVitD = data.totalVitD.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Total lipid (fat)(g), Vitamin A RAE(mcg), Vitamin E(mg), Vitamin D(IU)' };
+            return data;
+        }
+    },
+    {
+        id: 'antioxidant_synergy',
+        name: 'Vitamin C + Vitamin E Antioxidant Network',
+        category: 'Antioxidant Network',
+        type: 'science',
+        organ: 'heart',
+        effect: 'positive',
+        intensity: 0.8,
+        threshold: 'Vitamin C > 20 mg AND Vitamin E > 2 mg',
+        mechanism: 'Vitamin C regenerates oxidized Vitamin E (tocopheroxyl radical back to tocopherol), creating a synergistic antioxidant cycle that provides enhanced cardiovascular protection against LDL oxidation.',
+        check: function(foods) {
+            const totalVitC = foods.reduce((s, f) => s + parseFloat(f['Vitamin C, total ascorbic acid(mg)'] || f.vitC || 0), 0);
+            const totalVitE = foods.reduce((s, f) => s + parseFloat(f['Vitamin E (alpha-tocopherol)(mg)'] || f.vitE || 0), 0);
+            return totalVitC > 20 && totalVitE > 2;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalVitC: 0, totalVitE: 0 };
+            foods.forEach(f => {
+                const vitC = parseFloat(f['Vitamin C, total ascorbic acid(mg)'] || f.vitC || 0);
+                const vitE = parseFloat(f['Vitamin E (alpha-tocopherol)(mg)'] || f.vitE || 0);
+                data.perFood.push({ name: f.title || f.name, vitC: vitC.toFixed(2), vitE: vitE.toFixed(2) });
+                data.totalVitC += vitC;
+                data.totalVitE += vitE;
+            });
+            data.totalVitC = data.totalVitC.toFixed(2);
+            data.totalVitE = data.totalVitE.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Vitamin C, total ascorbic acid(mg); Vitamin E (alpha-tocopherol)(mg)' };
+            return data;
+        }
+    },
+    {
+        id: 'high_saturated_fat',
+        name: 'High Saturated Fat Load',
+        category: 'Metabolic Stress',
+        type: 'science',
+        organ: 'liver',
+        effect: 'negative',
+        intensity: 0.7,
+        threshold: 'Total saturated fat > 20g',
+        mechanism: 'Excessive saturated fat intake overwhelms hepatic lipid processing pathways, promotes hepatic steatosis (fatty liver), increases VLDL production, and activates inflammatory pathways through TLR4 signaling in Kupffer cells.',
+        check: function(foods) {
+            const totalSatFat = foods.reduce((s, f) => s + parseFloat(f['Fatty acids, total saturated(g)'] || f.satFat || 0), 0);
+            return totalSatFat > 20;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalSatFat: 0 };
+            foods.forEach(f => {
+                const satFat = parseFloat(f['Fatty acids, total saturated(g)'] || f.satFat || 0);
+                data.perFood.push({ name: f.title || f.name, satFat: satFat.toFixed(2) });
+                data.totalSatFat += satFat;
+            });
+            data.totalSatFat = data.totalSatFat.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Fatty acids, total saturated(g)' };
+            return data;
+        }
+    },
+    {
+        id: 'high_sodium',
+        name: 'High Sodium Intake',
+        category: 'Cardiovascular Risk',
+        type: 'science',
+        organ: 'heart',
+        effect: 'negative',
+        intensity: 0.65,
+        threshold: 'Total sodium > 1500 mg',
+        mechanism: 'Excessive sodium increases extracellular fluid volume and arterial pressure. Chronic high sodium activates the RAAS system, promotes endothelial dysfunction, and increases cardiovascular disease risk substantially.',
+        check: function(foods) {
+            const totalSodium = foods.reduce((s, f) => s + parseFloat(f['Sodium, Na(mg)'] || f.Sodium || f.sodium || 0), 0);
+            return totalSodium > 1500;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalSodium: 0 };
+            foods.forEach(f => {
+                const sodium = parseFloat(f['Sodium, Na(mg)'] || f.Sodium || f.sodium || 0);
+                data.perFood.push({ name: f.title || f.name, sodium: sodium.toFixed(2) });
+                data.totalSodium += sodium;
+            });
+            data.totalSodium = data.totalSodium.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Sodium, Na(mg)' };
+            return data;
+        }
+    },
+    {
+        id: 'calcium_magnesium',
+        name: 'Calcium + Magnesium Balance',
+        category: 'Mineral Balance',
+        type: 'science',
+        organ: 'heart',
+        effect: 'positive',
+        intensity: 0.7,
+        threshold: 'Calcium > 300 mg AND Magnesium > 100 mg',
+        mechanism: 'Balanced calcium and magnesium intake supports proper cardiac rhythm, vascular tone, and neuromuscular function. Magnesium acts as a natural calcium channel blocker, preventing calcification while maintaining electrolyte homeostasis.',
+        check: function(foods) {
+            const totalCa = foods.reduce((s, f) => s + parseFloat(f['Calcium, Ca(mg)'] || f.calcium || 0), 0);
+            const totalMg = foods.reduce((s, f) => s + parseFloat(f['Magnesium, Mg(mg)'] || f.magnesium || 0), 0);
+            return totalCa > 300 && totalMg > 100;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], totalCa: 0, totalMg: 0 };
+            foods.forEach(f => {
+                const ca = parseFloat(f['Calcium, Ca(mg)'] || f.calcium || 0);
+                const mg = parseFloat(f['Magnesium, Mg(mg)'] || f.magnesium || 0);
+                data.perFood.push({ name: f.title || f.name, calcium: ca.toFixed(2), magnesium: mg.toFixed(2) });
+                data.totalCa += ca;
+                data.totalMg += mg;
+            });
+            data.totalCa = data.totalCa.toFixed(2);
+            data.totalMg = data.totalMg.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'Calcium, Ca(mg); Magnesium, Mg(mg)' };
+            return data;
+        }
+    },
+    {
+        id: 'prebiotic_probiotic',
+        name: 'Probiotic + Prebiotic Synbiotic',
+        category: 'Gut Microbiome',
+        type: 'science',
+        organ: 'intestines',
+        effect: 'positive',
+        intensity: 0.85,
+        threshold: 'Probiotic ingredients + Fiber > 8g',
+        mechanism: 'Probiotic bacteria (Lactobacillus, Bifidobacterium) from fermented foods are sustained by prebiotic fiber (inulin, FOS), creating a synbiotic effect that enhances gut colonization, SCFA production, and mucosal immunity.',
+        check: function(foods) {
+            const allIngredients = foods.flatMap(f => f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || []);
+            const hasProbiotic = allIngredients.some(i => /yogurt|kefir|kimchi|sauerkraut|miso|tempeh|kombucha|ferment/.test(i));
+            const totalFiber = foods.reduce((s, f) => s + parseFloat(f['Fiber, total dietary(g)'] || f.fiber || 0), 0);
+            return hasProbiotic && totalFiber > 8;
+        },
+        collectData: function(foods) {
+            const data = { perFood: [], probioticItems: [], totalFiber: 0 };
+            foods.forEach(f => {
+                const ings = f.ingredients?.map(i => (typeof i === 'string' ? i : i.name || i.ingredient || '').toLowerCase()) || [];
+                const probiotic = ings.filter(i => /yogurt|kefir|kimchi|sauerkraut|miso|tempeh|kombucha|ferment/.test(i));
+                const fiber = parseFloat(f['Fiber, total dietary(g)'] || f.fiber || 0);
+                data.perFood.push({ name: f.title || f.name, probioticItems: probiotic, fiber: fiber.toFixed(2) });
+                data.probioticItems.push(...probiotic);
+                data.totalFiber += fiber;
+            });
+            data.totalFiber = data.totalFiber.toFixed(2);
+            data.apiNote = { endpoint: '/search-recipe/{id}', fields: 'ingredients[], Fiber, total dietary(g)' };
+            return data;
+        }
+    }
+];
+
+// ======================== DEMO FOODS ========================
+const demoFoods = [
+    {
+        recipe_id: 'demo_1',
+        title: 'Spinach Salad with Orange',
+        Region: 'Mediterranean',
+        'Energy(kcal)': 180,
+        'Protein(g)': 8.5,
+        'Carbohydrate, by difference(g)': 22,
+        'Total lipid (fat)(g)': 7.2,
+        'Iron, Fe(mg)': 3.5,
+        'Vitamin C, total ascorbic acid(mg)': 65,
+        'Fiber, total dietary(g)': 4.2,
+        'Calcium, Ca(mg)': 120,
+        'Magnesium, Mg(mg)': 55,
+        'Vitamin A, RAE(mcg)': 280,
+        'Vitamin E (alpha-tocopherol)(mg)': 1.8,
+        'Vitamin D(IU)': 0,
+        'Sodium, Na(mg)': 180,
+        'Fatty acids, total saturated(g)': 1.1,
+        Processes: ['wash', 'chop', 'toss', 'dress'],
+        ingredients: ['baby spinach', 'navel orange', 'red onion', 'walnuts', 'feta cheese', 'olive oil', 'lemon juice', 'iron-rich spinach leaves']
+    },
+    {
+        recipe_id: 'demo_2',
+        title: 'Turmeric Rice with Black Pepper',
+        Region: 'Indian',
+        'Energy(kcal)': 320,
+        'Protein(g)': 6.8,
+        'Carbohydrate, by difference(g)': 58,
+        'Total lipid (fat)(g)': 8.5,
+        'Iron, Fe(mg)': 1.2,
+        'Vitamin C, total ascorbic acid(mg)': 2.1,
+        'Fiber, total dietary(g)': 3.8,
+        'Calcium, Ca(mg)': 45,
+        'Magnesium, Mg(mg)': 38,
+        'Vitamin A, RAE(mcg)': 0,
+        'Vitamin E (alpha-tocopherol)(mg)': 0.4,
+        'Vitamin D(IU)': 0,
+        'Sodium, Na(mg)': 290,
+        'Fatty acids, total saturated(g)': 4.2,
+        Processes: ['cook', 'boil', 'simmer', 'toast'],
+        ingredients: ['basmati rice', 'turmeric', 'black pepper', 'cumin seeds', 'ghee', 'salt', 'water', 'bay leaf']
+    },
+    {
+        recipe_id: 'demo_3',
+        title: 'Grilled Salmon with Broccoli',
+        Region: 'American',
+        'Energy(kcal)': 420,
+        'Protein(g)': 45,
+        'Carbohydrate, by difference(g)': 12,
+        'Total lipid (fat)(g)': 22,
+        'Iron, Fe(mg)': 2.8,
+        'Vitamin C, total ascorbic acid(mg)': 89,
+        'Fiber, total dietary(g)': 5.4,
+        'Calcium, Ca(mg)': 210,
+        'Magnesium, Mg(mg)': 78,
+        'Vitamin A, RAE(mcg)': 150,
+        'Vitamin E (alpha-tocopherol)(mg)': 3.5,
+        'Vitamin D(IU)': 526,
+        'Sodium, Na(mg)': 380,
+        'Fatty acids, total saturated(g)': 3.8,
+        Processes: ['grill', 'season', 'steam', 'heat'],
+        ingredients: ['salmon fillet', 'broccoli florets', 'olive oil', 'garlic', 'lemon', 'salt', 'black pepper', 'dill']
+    }
+];
+
+// ======================== SEARCH FUNCTIONALITY ========================
+let searchTimeout = null;
+const searchInput = document.getElementById('food-search');
+const searchResultsEl = document.getElementById('search-results');
+
+searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+    if (query.length < 2) {
+        searchResultsEl.innerHTML = '';
+        return;
+    }
+    searchResultsEl.innerHTML = '<div class="search-loading">Searching...</div>';
+    searchTimeout = setTimeout(() => searchFoods(query), 1000);
+});
+
+async function searchFoods(query) {
+    try {
+        const response = await fetch(
+            `${RECIPE_API_BASE}/recipe-bytitle/recipeByTitle?title=${encodeURIComponent(query)}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${RECIPE_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        if (response.status === 429) {
+            searchResultsEl.innerHTML = '<div class="search-loading" style="color:var(--amber);">API rate limit reached. Please wait a moment and try again.</div>';
+            return;
+        }
+        if (!response.ok) {
+            searchResultsEl.innerHTML = '<div class="search-loading">No results found. Try different keywords.</div>';
+            return;
+        }
+        const data = await response.json();
+        const recipes = data.payload?.data || data.data || data || [];
+        const results = Array.isArray(recipes) ? recipes.slice(0, 8) : [];
+        if (results.length === 0) {
+            searchResultsEl.innerHTML = '<div class="search-loading">No results found. Try different keywords.</div>';
+            return;
+        }
+        searchResultsEl.innerHTML = results.map(r => {
+            const id = r.recipe_id || r._id || r.id || '';
+            const title = r.title || r.name || 'Unknown';
+            const region = r.Region || r.region || '';
+            const cal = r['Energy(kcal)'] || r.calories || '';
+            return `<div class="search-result-item" onclick="selectSearchResult('${id}', '${escapeHtml(title)}')">
+                <div class="name">${escapeHtml(title)}</div>
+                <div class="meta">${region ? region + ' | ' : ''}${cal ? cal + ' kcal' : 'ID: ' + id}</div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        console.error('Search failed:', e);
+        searchResultsEl.innerHTML = '<div class="search-loading">Search failed. Check your connection.</div>';
+    }
+}
+
+async function selectSearchResult(recipeId, title) {
+    if (selectedFoods.length >= 6) {
+        alert('Maximum 6 foods allowed.');
+        return;
+    }
+    if (selectedFoods.some(f => (f.recipe_id || f._id) === recipeId)) {
+        alert('This food is already selected.');
+        return;
+    }
+    searchResultsEl.innerHTML = '<div class="search-loading">Loading recipe details...</div>';
+    try {
+        const response = await fetch(
+            `${RECIPE_API_BASE}/search-recipe/${recipeId}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${RECIPE_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        if (response.status === 429) {
+            searchResultsEl.innerHTML = '<div class="search-loading" style="color:var(--amber);">API rate limit reached. Please wait and try again.</div>';
+            return;
+        }
+        if (!response.ok) throw new Error('Failed to fetch recipe');
+        const data = await response.json();
+        const recipe = data.payload?.data || data.data || data;
+        if (recipe) {
+            recipe.recipe_id = recipe.recipe_id || recipe._id || recipeId;
+            addFood(recipe);
+        }
+    } catch (e) {
+        console.error('Recipe fetch failed:', e);
+        searchResultsEl.innerHTML = '<div class="search-loading" style="color:var(--red);">Failed to load recipe details.</div>';
+    }
+    searchInput.value = '';
+    searchResultsEl.innerHTML = '';
+}
+
+function addFood(food) {
+    if (selectedFoods.length >= 6) return;
+    selectedFoods.push(food);
+    updateSelectedFoodsUI();
+    updateCalculateButton();
+}
+
+function removeFood(index) {
+    selectedFoods.splice(index, 1);
+    updateSelectedFoodsUI();
+    updateCalculateButton();
+}
+
+function updateSelectedFoodsUI() {
+    const container = document.getElementById('selected-foods');
+    let html = `<div class="selected-header">Selected Foods (${selectedFoods.length}/6)</div>`;
+    selectedFoods.forEach((food, i) => {
+        const title = food.title || food.name || 'Unknown Food';
+        const cal = food['Energy(kcal)'] || food.calories || '?';
+        const region = food.Region || food.region || '';
+        html += `<div class="selected-food-card">
+            <div class="food-name">${escapeHtml(title)}</div>
+            <div class="food-detail">${region ? region + ' | ' : ''}${cal} kcal | ${(food.ingredients || []).length} ingredients</div>
+            <button class="remove-btn" onclick="removeFood(${i})" title="Remove">&times;</button>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+function updateCalculateButton() {
+    document.getElementById('calculate-btn').disabled = selectedFoods.length < 2;
+}
+
+function loadDemoFoods() {
+    selectedFoods = JSON.parse(JSON.stringify(demoFoods));
+    updateSelectedFoodsUI();
+    updateCalculateButton();
+    document.getElementById('demo-btn').textContent = 'Demo Loaded';
+    setTimeout(() => { document.getElementById('demo-btn').textContent = 'Load Demo Foods'; }, 1500);
+}
+
+// ======================== FLAVORDB INTEGRATION ========================
+async function fetchFlavorData(ingredientName) {
+    try {
+        const response = await fetch(
+            `${FLAVORDB_API_BASE}/entities/by-entity-alias-readable?entity_alias_readable=${encodeURIComponent(ingredientName)}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${FLAVORDB_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data.content || data || null;
+    } catch (e) {
+        console.warn('FlavorDB lookup failed for', ingredientName);
+        return null;
+    }
+}
+
+async function fetchFlavorProfiles(foods) {
+    const results = {};
+    const keyIngredients = [];
+    foods.forEach(f => {
+        const ings = f.ingredients || [];
+        const topIngs = ings.slice(0, 3).map(i => typeof i === 'string' ? i : (i.name || i.ingredient || ''));
+        topIngs.forEach(name => {
+            const clean = name.toLowerCase().replace(/\s*(fresh|dried|ground|chopped|minced|sliced|diced|whole|raw|cooked)\s*/gi, '').trim();
+            if (clean.length > 2 && !keyIngredients.includes(clean)) {
+                keyIngredients.push(clean);
+            }
+        });
+    });
+
+    const uniqueIngs = keyIngredients.slice(0, 8);
+    for (const ing of uniqueIngs) {
+        const data = await fetchFlavorData(ing);
+        if (data) {
+            results[ing] = Array.isArray(data) ? data[0] : data;
+        }
+        await new Promise(r => setTimeout(r, 200));
+    }
+    return results;
+}
+
+// ======================== COMPATIBILITY ANALYSIS ========================
+async function calculateCompatibility() {
+    if (selectedFoods.length < 2) return;
+
+    const btn = document.getElementById('calculate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+
+    document.getElementById('analysis-placeholder').style.display = 'none';
+    const contentEl = document.getElementById('analysis-content');
+    contentEl.style.display = 'block';
+    contentEl.innerHTML = '<div class="status-msg">Running compatibility analysis and fetching flavor profiles...</div>';
+
+    let flavorResults = {};
+    try {
+        flavorResults = await fetchFlavorProfiles(selectedFoods);
+    } catch (e) {
+        console.warn('Flavor fetch error:', e);
+    }
+    flavorData = flavorResults;
+
+    const triggered = [];
+    compatibilityRules.forEach(rule => {
+        try {
+            if (rule.check(selectedFoods)) {
+                const ruleData = rule.collectData(selectedFoods);
+                triggered.push({ ...rule, data: ruleData });
+            }
+        } catch (e) {
+            console.warn('Rule check error for', rule.id, e);
+        }
+    });
+
+    const positiveRules = triggered.filter(r => r.effect === 'positive');
+    const negativeRules = triggered.filter(r => r.effect === 'negative');
+
+    const totalPositiveIntensity = positiveRules.reduce((s, r) => s + r.intensity, 0);
+    const totalNegativeIntensity = negativeRules.reduce((s, r) => s + r.intensity, 0);
+    const rawScore = 100 + (totalPositiveIntensity * 20) - (totalNegativeIntensity * 30);
+    const score = Math.max(0, Math.min(100, rawScore));
+
+    let status, statusColor;
+    if (score >= 80) { status = 'Highly Compatible'; statusColor = 'var(--green)'; }
+    else if (score >= 60) { status = 'Mostly Compatible'; statusColor = '#84cc16'; }
+    else if (score >= 40) { status = 'Use with Caution'; statusColor = 'var(--amber)'; }
+    else { status = 'Not Recommended'; statusColor = 'var(--red)'; }
+
+    const summaryParts = [];
+    if (positiveRules.length > 0) summaryParts.push(`${positiveRules.length} beneficial ${positiveRules.length === 1 ? 'synergy' : 'synergies'}`);
+    if (negativeRules.length > 0) summaryParts.push(`${negativeRules.length} ${negativeRules.length === 1 ? 'concern' : 'concerns'}`);
+    const summaryText = summaryParts.join(', ') || 'No significant interactions detected';
+
+    organEffects = {};
+    triggered.forEach(r => {
+        if (!organEffects[r.organ]) organEffects[r.organ] = [];
+        organEffects[r.organ].push({ name: r.name, effect: r.effect, intensity: r.intensity });
+    });
+    updateOrganColors();
+
+    analysisResults = { score, status, statusColor, positiveRules, negativeRules, triggered, totalPositiveIntensity, totalNegativeIntensity, rawScore, summaryText };
+    renderAnalysis(analysisResults, flavorResults);
+
+    btn.disabled = false;
+    btn.textContent = 'Analyze Compatibility';
+}
+
+function renderAnalysis(results, flavorResults) {
+    const { score, status, statusColor, positiveRules, negativeRules, totalPositiveIntensity, totalNegativeIntensity, rawScore, summaryText } = results;
+    const contentEl = document.getElementById('analysis-content');
+
+    let html = '';
+
+    // SCORE SECTION
+    html += `<div class="score-section">
+        <div class="score-top">
+            <div class="score-number" style="color:${statusColor}">${Math.round(score)}</div>
+            <div class="score-bar-container">
+                <div class="score-label" style="color:${statusColor}">${status}</div>
+                <div class="score-bar">
+                    <div class="score-bar-fill" style="width:${score}%;background:${statusColor}"></div>
+                </div>
+            </div>
+        </div>
+        <div class="score-summary">${summaryText}</div>
+    </div>`;
+
+    // BENEFICIAL SYNERGIES
+    if (positiveRules.length > 0) {
+        html += `<div class="section-block">
+            <div class="section-title beneficial" onclick="toggleSection(this)">
+                <span>&#10003;</span> Beneficial Synergies (${positiveRules.length})
+                <span class="chevron">&#9660;</span>
+            </div>
+            <div class="section-body">`;
+        positiveRules.forEach(rule => {
+            html += renderRuleCard(rule, 'positive');
+        });
+        html += `</div></div>`;
+    }
+
+    // POTENTIAL CONCERNS
+    if (negativeRules.length > 0) {
+        html += `<div class="section-block">
+            <div class="section-title concerns" onclick="toggleSection(this)">
+                <span>&#9888;</span> Potential Concerns (${negativeRules.length})
+                <span class="chevron">&#9660;</span>
+            </div>
+            <div class="section-body">`;
+        negativeRules.forEach(rule => {
+            html += renderRuleCard(rule, 'negative');
+        });
+        html += `</div></div>`;
+    }
+
+    // FLAVOR PROFILE ANALYSIS
+    html += `<div class="section-block">
+        <div class="section-title flavor" onclick="toggleSection(this)">
+            <span>&#9733;</span> Flavor Profile Analysis
+            <span class="chevron">&#9660;</span>
+        </div>
+        <div class="section-body">`;
+    const flavorKeys = Object.keys(flavorResults || {});
+    if (flavorKeys.length > 0) {
+        flavorKeys.forEach(key => {
+            const entity = flavorResults[key];
+            if (!entity) return;
+            const entityName = entity.entity_alias_readable || entity.alias || key;
+            const category = entity.category_readable || entity.category || 'Unknown';
+            const entityId = entity.entity_id || entity._id || 'N/A';
+            const naturalSource = entity.natural_source_name || entity.natural_source || '';
+            html += `<div class="flavor-card">
+                <div class="flavor-entity-name">${escapeHtml(entityName)}</div>
+                <div class="flavor-category">${escapeHtml(category)} | FlavorDB Entity ID: ${entityId}</div>
+                ${naturalSource ? `<div class="flavor-detail">Natural Source: ${escapeHtml(naturalSource)}</div>` : ''}
+                <div class="flavor-detail" style="margin-top:4px;">
+                    <span style="font-size:10px;color:var(--text-muted);">via FlavorDB /entities/by-entity-alias-readable</span>
+                </div>
+            </div>`;
+        });
+    } else {
+        html += `<div class="flavor-none">No FlavorDB data available. API may be rate-limited or ingredients not found in database.</div>`;
+    }
+    html += `</div></div>`;
+
+    // SCORING METHODOLOGY
+    html += `<div class="section-block">
+        <div class="section-title methodology" onclick="toggleSection(this)">
+            <span>&#9881;</span> Scoring Methodology
+            <span class="chevron">&#9660;</span>
+        </div>
+        <div class="section-body">
+            <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:10px;">How We Calculated This Score</div>
+            <div class="method-table">
+                <div class="method-row header"><span>Component</span><span>Impact</span></div>
+                <div class="method-row"><span>Base Score</span><span style="color:var(--text-primary)">100</span></div>
+                <div class="method-row divider"></div>`;
+
+    if (positiveRules.length > 0) {
+        positiveRules.forEach(r => {
+            const impact = (r.intensity * 20).toFixed(1);
+            html += `<div class="method-row positive-row"><span>+ ${escapeHtml(r.name.substring(0, 25))}</span><span>${r.intensity.toFixed(2)} x 20 = +${impact}</span></div>`;
+        });
+        html += `<div class="method-row divider"></div>
+            <div class="method-row total"><span>Positive Total</span><span style="color:var(--green)">+${(totalPositiveIntensity * 20).toFixed(1)}</span></div>
+            <div class="method-row divider"></div>`;
+    }
+
+    if (negativeRules.length > 0) {
+        negativeRules.forEach(r => {
+            const impact = (r.intensity * 30).toFixed(1);
+            html += `<div class="method-row negative-row"><span>- ${escapeHtml(r.name.substring(0, 25))}</span><span>${r.intensity.toFixed(2)} x 30 = -${impact}</span></div>`;
+        });
+        html += `<div class="method-row divider"></div>
+            <div class="method-row total"><span>Negative Total</span><span style="color:var(--red)">-${(totalNegativeIntensity * 30).toFixed(1)}</span></div>
+            <div class="method-row divider"></div>`;
+    }
+
+    html += `<div class="method-row"><span>Raw Score</span><span>100 + ${(totalPositiveIntensity * 20).toFixed(1)} - ${(totalNegativeIntensity * 30).toFixed(1)} = ${rawScore.toFixed(1)}</span></div>
+        <div class="method-row"><span>Clamped</span><span>min(100, max(0, ${rawScore.toFixed(1)}))</span></div>
+        <div class="method-row final"><span>Final Score</span><span>${Math.round(score)}</span></div>
+    </div>
+    <div class="method-formula">Formula:<br>score = clamp(0, 100,<br>&nbsp;&nbsp;100 + &Sigma;(positive_intensity &times; 20) - &Sigma;(negative_intensity &times; 30))</div>
+    </div></div>`;
+
+    // DATA SOURCES & APIs USED
+    html += `<div class="section-block">
+        <div class="section-title datasource" onclick="toggleSection(this)">
+            <span>&#128225;</span> Data Sources &amp; APIs Used
+            <span class="chevron">&#9660;</span>
+        </div>
+        <div class="section-body">
+            <div class="datasource-block">
+                <div class="datasource-title" style="color:var(--cyan);">&#128313; FoodOscope Recipe2 API</div>
+                <div class="datasource-url">Base: api.foodoscope.com/recipe2-api</div>
+                <div class="datasource-detail"><strong>Endpoints Called:</strong></div>
+                <div class="datasource-detail">&bull; /recipe-bytitle/recipeByTitle &rarr; Food search by name</div>
+                <div class="datasource-detail">&bull; /search-recipe/{id} &rarr; Full recipe + ingredients + nutritional data</div>
+                <div class="datasource-detail" style="margin-top:6px;"><strong>Database:</strong> 118,083 recipes</div>
+                <div class="datasource-detail" style="margin-top:4px;"><strong>Fields Used:</strong> Energy(kcal), Protein(g), Carbohydrate(g), Total lipid fat(g), Iron Fe(mg), Vitamin C total ascorbic acid(mg), Fiber total dietary(g), Sodium Na(mg), Fatty acids total saturated(g), Vitamin E alpha-tocopherol(mg), Calcium Ca(mg), Magnesium Mg(mg), Vitamin A RAE(mcg), Vitamin D(IU), Processes[], ingredients[]</div>
+            </div>
+            <div class="datasource-block">
+                <div class="datasource-title" style="color:var(--purple);">&#128313; FoodOscope FlavorDB API</div>
+                <div class="datasource-url">Base: api.foodoscope.com/flavordb</div>
+                <div class="datasource-detail"><strong>Endpoints Called:</strong></div>
+                <div class="datasource-detail">&bull; /entities/by-entity-alias-readable &rarr; Ingredient flavor entity lookup</div>
+                <div class="datasource-detail">&bull; /molecules_data/by-flavorProfile &rarr; Flavor molecule data</div>
+                <div class="datasource-detail" style="margin-top:6px;"><strong>Data:</strong> Flavor profiles, categories, molecule compounds, natural sources</div>
+            </div>
+            <div class="datasource-disclaimer">&#9888;&#65039; Disclaimer: Analysis is based on Ayurvedic principles and nutritional science patterns. This is not medical advice. Consult a healthcare professional for dietary guidance.</div>
+        </div>
+    </div>`;
+
+    contentEl.innerHTML = html;
+}
+
+function renderRuleCard(rule, type) {
+    const isPositive = type === 'positive';
+    const icon = isPositive ? '&#10004;' : '&#9888;';
+    const iconColor = isPositive ? 'var(--green)' : 'var(--red)';
+    const typeTag = rule.type === 'ayurveda'
+        ? '<span class="tag tag-ayurveda">Ayurvedic</span>'
+        : '<span class="tag tag-science">Scientific</span>';
+    const categoryTag = `<span class="tag tag-category">${escapeHtml(rule.category)}</span>`;
+    const organName = rule.organ.charAt(0).toUpperCase() + rule.organ.slice(1);
+
+    let html = `<div class="rule-card ${type}">
+        <div class="rule-header">
+            <span class="rule-icon" style="color:${iconColor}">${icon}</span>
+            <div class="rule-name">${escapeHtml(rule.name)}</div>
+        </div>
+        <div class="rule-tags">${typeTag}${categoryTag}</div>
+        <div class="rule-organ">Target Organ: <strong>${organName}</strong></div>`;
+
+    // WHY THIS WAS TRIGGERED
+    html += `<div class="rule-divider">Why This Was Triggered</div>
+        <div class="threshold-text">Threshold: ${escapeHtml(rule.threshold)}</div>`;
+
+    // VALUES FOUND
+    if (rule.data) {
+        html += `<div style="font-size:11px;color:var(--text-secondary);margin:6px 0 4px;">Values Found (from API):</div>`;
+        html += renderRuleValues(rule);
+    }
+
+    // SCIENTIFIC MECHANISM
+    html += `<div class="rule-divider">Scientific Mechanism</div>
+        <div class="mechanism-text">${escapeHtml(rule.mechanism)}</div>`;
+
+    // SCORE IMPACT
+    const multiplier = isPositive ? 20 : 30;
+    const impact = (rule.intensity * multiplier).toFixed(1);
+    const sign = isPositive ? '+' : '-';
+    html += `<div class="rule-divider">Score Impact</div>
+        <div class="score-impact ${type}">Intensity: ${rule.intensity.toFixed(2)} &times; ${multiplier} = ${sign}${impact} pts</div>`;
+
+    // API SOURCE
+    if (rule.data?.apiNote) {
+        html += `<div class="api-source">&#128225; Data: FoodOscope Recipe2 API<br>Endpoint: ${escapeHtml(rule.data.apiNote.endpoint)}<br>Fields: ${escapeHtml(rule.data.apiNote.fields)}</div>`;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+function renderRuleValues(rule) {
+    const d = rule.data;
+    let html = '<div class="values-table">';
+
+    d.perFood?.forEach(pf => {
+        html += `<div class="values-food">
+            <div class="values-food-name">${escapeHtml(pf.name)}</div>`;
+
+        // Nutrient values
+        if (pf.iron !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Iron: ${pf.iron} mg</div>`;
+        if (pf.vitC !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Vitamin C: ${pf.vitC} mg</div>`;
+        if (pf.vitE !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Vitamin E: ${pf.vitE} mg</div>`;
+        if (pf.vitA !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Vitamin A: ${pf.vitA} mcg</div>`;
+        if (pf.vitD !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Vitamin D: ${pf.vitD} IU</div>`;
+        if (pf.fat !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Fat: ${pf.fat} g</div>`;
+        if (pf.protein !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Protein: ${pf.protein} g</div>`;
+        if (pf.carbs !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Carbs: ${pf.carbs} g</div>`;
+        if (pf.fiber !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Fiber: ${pf.fiber} g</div>`;
+        if (pf.sodium !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Sodium: ${pf.sodium} mg</div>`;
+        if (pf.satFat !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Saturated Fat: ${pf.satFat} g</div>`;
+        if (pf.calcium !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Calcium: ${pf.calcium} mg</div>`;
+        if (pf.magnesium !== undefined) html += `<div class="values-food-row">&nbsp;&nbsp;Magnesium: ${pf.magnesium} mg</div>`;
+
+        // Ingredient items
+        if (pf.dairy?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Dairy: ${pf.dairy.join(', ')}</div>`;
+        if (pf.acid?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Acidic: ${pf.acid.join(', ')}</div>`;
+        if (pf.fishItems?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Fish: ${pf.fishItems.join(', ')}</div>`;
+        if (pf.dairyItems?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Dairy: ${pf.dairyItems.join(', ')}</div>`;
+        if (pf.honeyItems?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Honey: ${pf.honeyItems.join(', ')}</div>`;
+        if (pf.processes?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Processes: ${pf.processes.join(', ')}</div>`;
+        if (pf.turmericItems?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Turmeric: ${pf.turmericItems.join(', ')}</div>`;
+        if (pf.pepperItems?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Pepper: ${pf.pepperItems.join(', ')}</div>`;
+        if (pf.fruits?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Fruits: ${pf.fruits.join(', ')}</div>`;
+        if (pf.probioticItems?.length) html += `<div class="values-food-row">&nbsp;&nbsp;Probiotic: ${pf.probioticItems.join(', ')}</div>`;
+
+        html += `</div>`;
+    });
+
+    // Totals
+    let totalLines = [];
+    if (d.totalIron !== undefined) {
+        const ok = parseFloat(d.totalIron) > 2;
+        totalLines.push(`Total Iron: ${d.totalIron} mg ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalVitC !== undefined) {
+        const threshold = rule.id === 'antioxidant_synergy' ? 20 : 15;
+        const ok = parseFloat(d.totalVitC) > threshold;
+        totalLines.push(`Total Vitamin C: ${d.totalVitC} mg ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalVitE !== undefined) {
+        const ok = parseFloat(d.totalVitE) > 2;
+        totalLines.push(`Total Vitamin E: ${d.totalVitE} mg ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalFat !== undefined) {
+        const threshold = rule.id === 'fat_vitamin_absorption' ? 8 : 30;
+        const ok = parseFloat(d.totalFat) > threshold;
+        totalLines.push(`Total Fat: ${d.totalFat} g ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalProtein !== undefined) {
+        const threshold = rule.id === 'heavy_protein_carb' ? 50 : 35;
+        const ok = parseFloat(d.totalProtein) > threshold;
+        totalLines.push(`Total Protein: ${d.totalProtein} g ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalCarbs !== undefined) {
+        const ok = parseFloat(d.totalCarbs) > 100;
+        totalLines.push(`Total Carbs: ${d.totalCarbs} g ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalFiber !== undefined) {
+        const threshold = rule.id === 'prebiotic_probiotic' ? 8 : 15;
+        const ok = parseFloat(d.totalFiber) > threshold;
+        totalLines.push(`Total Fiber: ${d.totalFiber} g ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalSodium !== undefined) {
+        const threshold = rule.id === 'milk_salt' ? 400 : 1500;
+        const ok = parseFloat(d.totalSodium) > threshold;
+        totalLines.push(`Total Sodium: ${d.totalSodium} mg ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalSatFat !== undefined) {
+        const ok = parseFloat(d.totalSatFat) > 20;
+        totalLines.push(`Total Saturated Fat: ${d.totalSatFat} g ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalCa !== undefined) {
+        const ok = parseFloat(d.totalCa) > 300;
+        totalLines.push(`Total Calcium: ${d.totalCa} mg ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalMg !== undefined) {
+        const ok = parseFloat(d.totalMg) > 100;
+        totalLines.push(`Total Magnesium: ${d.totalMg} mg ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalVitA !== undefined) {
+        const ok = parseFloat(d.totalVitA) > 100;
+        totalLines.push(`Total Vitamin A: ${d.totalVitA} mcg ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+    if (d.totalVitD !== undefined) {
+        const ok = parseFloat(d.totalVitD) > 50;
+        totalLines.push(`Total Vitamin D: ${d.totalVitD} IU ${ok ? '<span class="check">&#10004;</span>' : '<span class="cross">&#10008;</span>'}`);
+    }
+
+    if (totalLines.length > 0) {
+        html += `<div class="values-total">${totalLines.join('<br>')}</div>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+function toggleSection(titleEl) {
+    titleEl.classList.toggle('collapsed');
+    const body = titleEl.nextElementSibling;
+    body.classList.toggle('hidden');
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+}
+
+// ======================== THREE.JS 3D ANATOMICAL MODEL ========================
+let scene, camera, renderer, controls;
+let bodyGroup, organMeshes = {};
+let clock = new THREE.Clock();
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2();
+let hoveredOrgan = null;
+
+function initThreeJS() {
+    const canvas = document.getElementById('three-canvas');
+    const container = canvas.parentElement;
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0e27);
+
+    camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+    camera.position.set(0, 1.2, 3.5);
+
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 1.0, 0);
+    controls.minDistance = 1.5;
+    controls.maxDistance = 6;
+    controls.update();
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x334477, 0.6);
+    scene.add(ambientLight);
+
+    const mainLight = new THREE.DirectionalLight(0x88ccff, 0.8);
+    mainLight.position.set(2, 4, 3);
+    scene.add(mainLight);
+
+    const fillLight = new THREE.DirectionalLight(0x6644aa, 0.3);
+    fillLight.position.set(-2, 2, -1);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.PointLight(0x22d3ee, 0.4, 10);
+    rimLight.position.set(0, 2, -2);
+    scene.add(rimLight);
+
+    // Grid floor
+    const gridHelper = new THREE.GridHelper(4, 20, 0x1a2040, 0x111530);
+    gridHelper.position.y = -0.05;
+    scene.add(gridHelper);
+
+    // Build body
+    bodyGroup = new THREE.Group();
+    scene.add(bodyGroup);
+    buildBody();
+    buildOrgans();
+
+    // Events
+    canvas.addEventListener('mousemove', onMouseMove, false);
+    window.addEventListener('resize', onResize, false);
+
+    animate();
+}
+
+function buildBody() {
+    const bodyMaterial = new THREE.MeshBasicMaterial({
+        color: 0x22d3ee,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.15
+    });
+
+    // Head
+    const headGeo = new THREE.SphereGeometry(0.14, 16, 12);
+    const head = new THREE.Mesh(headGeo, bodyMaterial);
+    head.position.set(0, 1.88, 0);
+    head.scale.set(1, 1.1, 0.95);
+    bodyGroup.add(head);
+
+    // Neck
+    const neckGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.1, 8);
+    const neck = new THREE.Mesh(neckGeo, bodyMaterial);
+    neck.position.set(0, 1.7, 0);
+    bodyGroup.add(neck);
+
+    // Shoulders
+    const shoulderGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.36, 8);
+    const leftShoulder = new THREE.Mesh(shoulderGeo, bodyMaterial);
+    leftShoulder.rotation.z = Math.PI / 2;
+    leftShoulder.position.set(-0.2, 1.62, 0);
+    bodyGroup.add(leftShoulder);
+
+    const rightShoulder = new THREE.Mesh(shoulderGeo, bodyMaterial);
+    rightShoulder.rotation.z = Math.PI / 2;
+    rightShoulder.position.set(0.2, 1.62, 0);
+    bodyGroup.add(rightShoulder);
+
+    // Torso (hourglass lathe)
+    const torsoPoints = [];
+    torsoPoints.push(new THREE.Vector2(0.03, 0));
+    torsoPoints.push(new THREE.Vector2(0.19, 0.05));
+    torsoPoints.push(new THREE.Vector2(0.22, 0.15));
+    torsoPoints.push(new THREE.Vector2(0.21, 0.25));
+    torsoPoints.push(new THREE.Vector2(0.18, 0.35));
+    torsoPoints.push(new THREE.Vector2(0.15, 0.42));
+    torsoPoints.push(new THREE.Vector2(0.14, 0.48));
+    torsoPoints.push(new THREE.Vector2(0.16, 0.55));
+    torsoPoints.push(new THREE.Vector2(0.20, 0.65));
+    torsoPoints.push(new THREE.Vector2(0.22, 0.72));
+    torsoPoints.push(new THREE.Vector2(0.20, 0.78));
+    torsoPoints.push(new THREE.Vector2(0.06, 0.82));
+    const torsoGeo = new THREE.LatheGeometry(torsoPoints, 16);
+    const torso = new THREE.Mesh(torsoGeo, bodyMaterial);
+    torso.position.set(0, 0.83, 0);
+    bodyGroup.add(torso);
+
+    // Pelvis
+    const pelvisGeo = new THREE.SphereGeometry(0.18, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    const pelvis = new THREE.Mesh(pelvisGeo, bodyMaterial);
+    pelvis.position.set(0, 0.82, 0);
+    pelvis.rotation.x = Math.PI;
+    pelvis.scale.set(1.1, 0.4, 0.8);
+    bodyGroup.add(pelvis);
+
+    // Arms
+    buildArm(-1); // Left
+    buildArm(1);  // Right
+
+    // Legs
+    buildLeg(-1); // Left
+    buildLeg(1);  // Right
+}
+
+function buildArm(side) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x22d3ee, wireframe: true, transparent: true, opacity: 0.15 });
+    const x = side * 0.36;
+
+    // Upper arm
+    const upperArmGeo = new THREE.CylinderGeometry(0.04, 0.035, 0.32, 8);
+    const upperArm = new THREE.Mesh(upperArmGeo, mat);
+    upperArm.position.set(x, 1.44, 0);
+    upperArm.rotation.z = side * 0.12;
+    bodyGroup.add(upperArm);
+
+    // Elbow
+    const elbowGeo = new THREE.SphereGeometry(0.038, 8, 6);
+    const elbow = new THREE.Mesh(elbowGeo, mat);
+    elbow.position.set(x + side * 0.02, 1.27, 0);
+    bodyGroup.add(elbow);
+
+    // Forearm
+    const forearmGeo = new THREE.CylinderGeometry(0.035, 0.028, 0.3, 8);
+    const forearm = new THREE.Mesh(forearmGeo, mat);
+    forearm.position.set(x + side * 0.03, 1.1, 0);
+    forearm.rotation.z = side * 0.06;
+    bodyGroup.add(forearm);
+
+    // Hand
+    const handGeo = new THREE.SphereGeometry(0.035, 8, 6);
+    const hand = new THREE.Mesh(handGeo, mat);
+    hand.position.set(x + side * 0.04, 0.93, 0);
+    hand.scale.set(0.8, 1.2, 0.5);
+    bodyGroup.add(hand);
+}
+
+function buildLeg(side) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x22d3ee, wireframe: true, transparent: true, opacity: 0.15 });
+    const x = side * 0.1;
+
+    // Thigh
+    const thighGeo = new THREE.CylinderGeometry(0.07, 0.05, 0.4, 8);
+    const thigh = new THREE.Mesh(thighGeo, mat);
+    thigh.position.set(x, 0.58, 0);
+    bodyGroup.add(thigh);
+
+    // Knee
+    const kneeGeo = new THREE.SphereGeometry(0.052, 8, 6);
+    const knee = new THREE.Mesh(kneeGeo, mat);
+    knee.position.set(x, 0.37, 0);
+    bodyGroup.add(knee);
+
+    // Calf
+    const calfGeo = new THREE.CylinderGeometry(0.048, 0.035, 0.38, 8);
+    const calf = new THREE.Mesh(calfGeo, mat);
+    calf.position.set(x, 0.16, 0);
+    bodyGroup.add(calf);
+
+    // Ankle
+    const ankleGeo = new THREE.SphereGeometry(0.032, 8, 6);
+    const ankle = new THREE.Mesh(ankleGeo, mat);
+    ankle.position.set(x, -0.04, 0);
+    bodyGroup.add(ankle);
+
+    // Foot
+    const footGeo = new THREE.BoxGeometry(0.06, 0.03, 0.12);
+    const foot = new THREE.Mesh(footGeo, mat);
+    foot.position.set(x, -0.06, 0.03);
+    bodyGroup.add(foot);
+}
+
+function buildOrgans() {
+    // Brain
+    const brainGeo = new THREE.SphereGeometry(0.09, 16, 12);
+    const brainMat = new THREE.MeshPhongMaterial({
+        color: 0xe879a0,
+        emissive: 0x401020,
+        transparent: true,
+        opacity: 0.85,
+        shininess: 30
+    });
+    const brain = new THREE.Mesh(brainGeo, brainMat);
+    brain.position.set(0, 1.82, 0);
+    brain.scale.set(1, 0.85, 0.9);
+    brain.userData = { organ: 'brain', label: 'Brain', desc: 'Cognitive effects, mood, neurotransmitter function' };
+    bodyGroup.add(brain);
+    organMeshes.brain = brain;
+
+    // Liver
+    const liverGeo = new THREE.SphereGeometry(0.08, 12, 10);
+    const liverMat = new THREE.MeshPhongMaterial({
+        color: 0xc77840,
+        emissive: 0x301808,
+        transparent: true,
+        opacity: 0.85,
+        shininess: 20
+    });
+    const liver = new THREE.Mesh(liverGeo, liverMat);
+    liver.position.set(0.11, 1.0, 0.05);
+    liver.scale.set(1.3, 0.8, 0.7);
+    liver.userData = { organ: 'liver', label: 'Liver', desc: 'Detoxification, metabolism, bile production' };
+    bodyGroup.add(liver);
+    organMeshes.liver = liver;
+
+    // Stomach
+    const stomachGeo = new THREE.SphereGeometry(0.07, 12, 10);
+    const stomachMat = new THREE.MeshPhongMaterial({
+        color: 0xe8c847,
+        emissive: 0x302808,
+        transparent: true,
+        opacity: 0.85,
+        shininess: 20
+    });
+    const stomach = new THREE.Mesh(stomachGeo, stomachMat);
+    stomach.position.set(-0.06, 0.95, 0.08);
+    stomach.scale.set(1.0, 1.2, 0.8);
+    stomach.userData = { organ: 'stomach', label: 'Stomach', desc: 'Digestion, acid production, enzyme secretion' };
+    bodyGroup.add(stomach);
+    organMeshes.stomach = stomach;
+
+    // Intestines (tube path)
+    const intestineCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0.78, 0.06),
+        new THREE.Vector3(0.08, 0.72, 0.05),
+        new THREE.Vector3(-0.06, 0.65, 0.06),
+        new THREE.Vector3(0.07, 0.58, 0.05),
+        new THREE.Vector3(-0.05, 0.50, 0.06),
+        new THREE.Vector3(0.06, 0.44, 0.05),
+        new THREE.Vector3(0, 0.38, 0.04)
+    ]);
+    const intestineGeo = new THREE.TubeGeometry(intestineCurve, 40, 0.025, 8, false);
+    const intestineMat = new THREE.MeshPhongMaterial({
+        color: 0xe89040,
+        emissive: 0x301808,
+        transparent: true,
+        opacity: 0.85,
+        shininess: 20
+    });
+    const intestines = new THREE.Mesh(intestineGeo, intestineMat);
+    intestines.userData = { organ: 'intestines', label: 'Intestines', desc: 'Nutrient absorption, gut microbiome, immune function' };
+    bodyGroup.add(intestines);
+    organMeshes.intestines = intestines;
+
+    // Heart (not in the organ list, but referenced by rules - add invisible for color effects)
+    // We map heart rules to a visual indicator on the body but don't render a separate organ mesh per spec
+    // Instead, we'll add a small heart indicator near the chest
+    const heartGeo = new THREE.SphereGeometry(0.04, 10, 8);
+    const heartMat = new THREE.MeshPhongMaterial({
+        color: 0xf06070,
+        emissive: 0x401018,
+        transparent: true,
+        opacity: 0.0, // invisible by default since not in user's organ list
+        shininess: 30
+    });
+    const heart = new THREE.Mesh(heartGeo, heartMat);
+    heart.position.set(0.04, 1.2, 0.1);
+    heart.userData = { organ: 'heart', label: 'Heart', desc: 'Cardiovascular health, blood pressure regulation' };
+    bodyGroup.add(heart);
+    organMeshes.heart = heart;
+}
+
+function updateOrganColors() {
+    // Reset all organs to default colors
+    const defaultColors = {
+        brain: 0xe879a0,
+        liver: 0xc77840,
+        stomach: 0xe8c847,
+        intestines: 0xe89040,
+        heart: 0xf06070
+    };
+
+    Object.keys(organMeshes).forEach(key => {
+        const mesh = organMeshes[key];
+        if (!mesh) return;
+
+        const effects = organEffects[key] || [];
+        const hasPositive = effects.some(e => e.effect === 'positive');
+        const hasNegative = effects.some(e => e.effect === 'negative');
+
+        if (hasPositive && !hasNegative) {
+            mesh.material.color.setHex(0x10b981);
+            mesh.material.emissive.setHex(0x083828);
+            if (key === 'heart') mesh.material.opacity = 0.85;
+        } else if (hasNegative && !hasPositive) {
+            mesh.material.color.setHex(0xf87171);
+            mesh.material.emissive.setHex(0x401818);
+            if (key === 'heart') mesh.material.opacity = 0.85;
+        } else if (hasPositive && hasNegative) {
+            mesh.material.color.setHex(0xfbbf24);
+            mesh.material.emissive.setHex(0x302808);
+            if (key === 'heart') mesh.material.opacity = 0.85;
+        } else {
+            mesh.material.color.setHex(defaultColors[key]);
+            const dc = defaultColors[key];
+            mesh.material.emissive.setHex(
+                key === 'brain' ? 0x401020 :
+                key === 'liver' ? 0x301808 :
+                key === 'stomach' ? 0x302808 :
+                key === 'intestines' ? 0x301808 : 0x401018
+            );
+            if (key === 'heart') mesh.material.opacity = 0.0;
+        }
+    });
+
+    // Update legend dots
+    const legendItems = document.querySelectorAll('.legend-item');
+    const legendMap = { 0: 'brain', 1: 'liver', 2: 'stomach', 3: 'intestines' };
+    legendItems.forEach((item, i) => {
+        const key = legendMap[i];
+        if (!key) return;
+        const dot = item.querySelector('.legend-dot');
+        if (!dot) return;
+        const effects = organEffects[key] || [];
+        const hasPositive = effects.some(e => e.effect === 'positive');
+        const hasNegative = effects.some(e => e.effect === 'negative');
+        if (hasPositive && !hasNegative) dot.style.background = '#10b981';
+        else if (hasNegative && !hasPositive) dot.style.background = '#f87171';
+        else if (hasPositive && hasNegative) dot.style.background = '#fbbf24';
+        else {
+            const defaults = { brain: '#e879a0', liver: '#c77840', stomach: '#e8c847', intestines: '#e89040' };
+            dot.style.background = defaults[key];
+        }
+    });
+}
+
+function onMouseMove(event) {
+    const canvas = renderer.domElement;
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const organList = Object.values(organMeshes).filter(m => m.material.opacity > 0.1);
+    const intersects = raycaster.intersectObjects(organList);
+
+    const tooltip = document.getElementById('model-tooltip');
+
+    if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        const data = obj.userData;
+        if (data && data.organ) {
+            hoveredOrgan = data.organ;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (event.clientX - renderer.domElement.parentElement.getBoundingClientRect().left + 15) + 'px';
+            tooltip.style.top = (event.clientY - renderer.domElement.parentElement.getBoundingClientRect().top - 10) + 'px';
+            tooltip.querySelector('.tt-title').textContent = data.label;
+
+            let effectText = data.desc;
+            const effects = organEffects[data.organ] || [];
+            if (effects.length > 0) {
+                effectText = effects.map(e => {
+                    const icon = e.effect === 'positive' ? '+' : '-';
+                    return `${icon} ${e.name} (${(e.intensity * 100).toFixed(0)}%)`;
+                }).join('\n');
+            }
+            tooltip.querySelector('.tt-effect').textContent = effectText;
+            tooltip.querySelector('.tt-effect').style.whiteSpace = 'pre-line';
+            renderer.domElement.style.cursor = 'pointer';
+            return;
+        }
+    }
+
+    hoveredOrgan = null;
+    tooltip.style.display = 'none';
+    renderer.domElement.style.cursor = 'grab';
+}
+
+function onResize() {
+    const container = renderer.domElement.parentElement;
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const elapsed = clock.getElapsedTime();
+
+    // Gentle pulse on organs
+    Object.values(organMeshes).forEach(mesh => {
+        if (mesh.material.opacity > 0.1) {
+            const pulse = 1 + Math.sin(elapsed * 2 + mesh.position.x * 10) * 0.04;
+            mesh.scale.copy(mesh.userData._baseScale || mesh.scale.clone());
+            if (!mesh.userData._baseScale) {
+                mesh.userData._baseScale = mesh.scale.clone();
+            }
+            mesh.scale.multiplyScalar(pulse);
+        }
+    });
+
+    // Highlight hovered organ
+    Object.entries(organMeshes).forEach(([key, mesh]) => {
+        if (key === hoveredOrgan) {
+            mesh.material.emissiveIntensity = 1.5;
+        } else {
+            mesh.material.emissiveIntensity = 1.0;
+        }
+    });
+
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+// ======================== INIT ========================
+initThreeJS();
+</script>
+</body>
+</html>

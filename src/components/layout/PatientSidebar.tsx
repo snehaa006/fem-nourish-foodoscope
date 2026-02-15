@@ -11,10 +11,10 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { 
-  Home, 
-  Calendar, 
-  TrendingUp, 
+import {
+  Home,
+  Calendar,
+  TrendingUp,
   Bell,
   ShoppingCart,
   Settings,
@@ -24,7 +24,8 @@ import {
   ChefHat,
   Activity,
   Users,
-  Stethoscope
+  Stethoscope,
+  FlaskConical
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 
@@ -59,6 +60,11 @@ const navigationItems = [
   //   url: "/patient/lifestyle-tracker",
   //   icon: Heart,
   // },
+  {
+    title: "Food Compatibility",
+    url: "/patient/compatibility",
+    icon: FlaskConical,
+  },
   {
     title: "Social Support",
     url: "/patient/social-support",
